@@ -1,0 +1,405 @@
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  AppBar,
+  Avatar,
+  Box,
+  Chip,
+  Drawer,
+  ListItemIcon,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Toolbar,
+  Tooltip,
+  Typography,
+  useTheme,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import LogoutIcon from "@mui/icons-material/Logout";
+import MenuIcon from "@mui/icons-material/Menu";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import { useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../../store/authSlice";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import BusinessIcon from "@mui/icons-material/Business";
+import PeopleIcon from "@mui/icons-material/People";
+import QuizIcon from "@mui/icons-material/Quiz";
+import EventIcon from "@mui/icons-material/Event";
+import PersonIcon from "@mui/icons-material/Person";
+import CategoryIcon from "@mui/icons-material/Category";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import TipsAndUpdatesRoundedIcon from "@mui/icons-material/TipsAndUpdatesRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import { useThemeMode } from "../../context/ThemeModeContext";
+
+const drawerWidth = 260;
+const collapsedDrawerWidth = 88;
+const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
+
+const adminItems = [
+  { label: "Dashboard", to: "/admin/dashboard", icon: <DashboardIcon /> },
+  { label: "Company Users", to: "/admin/company-users", icon: <PeopleIcon /> },
+  { label: "Questions", to: "/admin/questions", icon: <QuizIcon /> },
+  { label: "Themes", to: "/admin/themes", icon: <CategoryIcon /> },
+  { label: "KPIs", to: "/admin/kpis", icon: <AssessmentIcon /> },
+  { label: "Challenges", to: "/admin/challenges", icon: <EmojiEventsIcon /> },
+  { label: "Sessions", to: "/admin/sessions", icon: <EventIcon /> },
+];
+
+const userItems = [
+  { label: "Dashboard", to: "/user/dashboard", icon: <DashboardIcon /> },
+  {
+    label: "My Responses",
+    to: "/user/my-responses",
+    icon: <AssignmentTurnedInIcon />,
+  },
+];
+
+const superAdminItems = [
+  {
+    label: "Dashboard",
+    to: "/super-admin/dashboard",
+    icon: <AdminPanelSettingsIcon />,
+  },
+  {
+    label: "Company Data",
+    to: "/super-admin/company-data",
+    icon: <BusinessIcon />,
+  },
+  {
+    label: "Suggestion Master",
+    to: "/super-admin/suggestion-master",
+    icon: <TipsAndUpdatesRoundedIcon />,
+  },
+  {
+    label: "KPI Suggestion Mapping",
+    to: "/super-admin/kpi-suggestion-mapping",
+    icon: <LinkRoundedIcon />,
+  },
+];
+
+export default function Layout({ children, role, title }) {
+  const dispatch = useDispatch();
+  const theme = useTheme();
+  const { mode, toggleColorMode } = useThemeMode();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+  });
+  const [menuAnchor, setMenuAnchor] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.user);
+  const stateRole = useSelector((state) => state.auth.role);
+  const profile = user || null;
+  const effectiveRole = stateRole || role || "admin";
+
+  const navItems =
+    effectiveRole === "user"
+      ? [
+          ...userItems,
+          { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
+        ]
+      : effectiveRole === "superadmin"
+        ? [
+            ...superAdminItems,
+            { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
+          ]
+      : [
+          ...adminItems,
+          { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
+        ];
+
+  const displayName = profile?.name || "Portal User";
+  const displayRole = (profile?.role || effectiveRole).toUpperCase();
+
+  const handleMenuOpen = (event) => setMenuAnchor(event.currentTarget);
+  const handleMenuClose = () => setMenuAnchor(null);
+
+  const handleProfile = () => {
+    handleMenuClose();
+    navigate("/profile");
+  };
+
+  const handleLogout = () => {
+    dispatch(logout());
+    handleMenuClose();
+    navigate("/login", { replace: true });
+  };
+
+  const handleSidebarAction = () => {
+    if (window.innerWidth < 900) {
+      setMobileOpen(true);
+      return;
+    }
+    setSidebarCollapsed((prev) => !prev);
+  };
+
+  const activeDrawerWidth = sidebarCollapsed
+    ? collapsedDrawerWidth
+    : drawerWidth;
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
+  const drawer = (
+    <Box sx={{ height: "100%", p: 2.5 }}>
+      {/* Sidebar Header */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: sidebarCollapsed ? "center" : "space-between",
+          mb: 2,
+        }}
+      >
+        {!sidebarCollapsed && (
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 800, whiteSpace: "nowrap" }}
+          >
+            Google Dashboard
+          </Typography>
+        )}
+
+        {/* <IconButton
+          onClick={() => setSidebarCollapsed((prev) => !prev)}
+          size="small"
+        >
+          {sidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton> */}
+      </Box>
+
+      {!sidebarCollapsed && (
+        <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
+          {effectiveRole === "admin"
+            ? "Admin Workspace"
+            : effectiveRole === "superadmin"
+              ? "Super Admin Workspace"
+              : "User Workspace"}
+        </Typography>
+      )}
+
+      <List sx={{ p: 0 }}>
+        {navItems.map((item) => {
+          const isActive =
+            location.pathname === item.to ||
+            location.pathname.startsWith(`${item.to}/`);
+          const navButton = (
+            <ListItemButton
+              key={item.to}
+              component={Link}
+              to={item.to}
+              onClick={() => setMobileOpen(false)}
+              sx={{
+                mb: 1,
+                borderRadius: 2,
+                justifyContent: sidebarCollapsed ? "center" : "flex-start",
+                px: sidebarCollapsed ? 1 : 2,
+                bgcolor: isActive ? "primary.main" : "transparent",
+                color: isActive ? "primary.contrastText" : "text.primary",
+                "&:hover": {
+                  bgcolor: isActive ? "primary.dark" : "action.hover",
+                },
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  mr: sidebarCollapsed ? 0 : 2,
+                  justifyContent: "center",
+                  color: "inherit",
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+
+              {/* TEXT */}
+              {!sidebarCollapsed && (
+                <ListItemText
+                  primary={item.label}
+                  sx={{
+                    opacity: sidebarCollapsed ? 0 : 1,
+                  }}
+                />
+              )}
+            </ListItemButton>
+          );
+
+          return sidebarCollapsed ? (
+            <Tooltip key={item.to} title={item.label} placement="right" arrow>
+              {navButton}
+            </Tooltip>
+          ) : (
+            navButton
+          );
+        })}
+      </List>
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "transparent" }}>
+      <AppBar
+        color="transparent"
+        elevation={0}
+        sx={{
+          width: { md: `calc(100% - ${activeDrawerWidth}px)` },
+          ml: { md: `${activeDrawerWidth}px` },
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          backdropFilter: "blur(8px)",
+          bgcolor: alpha(theme.palette.background.default, 0.8),
+          transition: (theme) =>
+            theme.transitions.create(["width", "margin-left"], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.shorter,
+            }),
+        }}
+      >
+        <Toolbar sx={{ minHeight: { xs: 64, sm: 72 } }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={handleSidebarAction}
+            sx={{ mr: 2 }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            {title || "Google Dashboard"}
+          </Typography>
+
+          <Box
+            sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1.2 }}
+          >
+            <Tooltip
+              title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              <IconButton onClick={toggleColorMode} color="inherit">
+                {mode === "dark" ? (
+                  <LightModeRoundedIcon />
+                ) : (
+                  <DarkModeRoundedIcon />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Chip
+              size="small"
+              label={displayRole}
+              sx={{
+                display: { xs: "none", sm: "inline-flex" },
+                bgcolor: alpha(theme.palette.primary.main, 0.16),
+                color: "primary.main",
+                fontWeight: 700,
+              }}
+            />
+            <IconButton onClick={handleMenuOpen} sx={{ p: 0.4 }}>
+              <Avatar sx={{ bgcolor: "primary.main", width: 38, height: 38 }}>
+                {displayName.charAt(0).toUpperCase()}
+              </Avatar>
+            </IconButton>
+          </Box>
+
+          <Menu
+            anchorEl={menuAnchor}
+            open={Boolean(menuAnchor)}
+            onClose={handleMenuClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+          >
+            <Box sx={{ px: 2, py: 1.2 }}>
+              <Typography sx={{ fontWeight: 700 }}>{displayName}</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {profile?.email || "No email"}
+              </Typography>
+            </Box>
+            <MenuItem onClick={handleProfile}>
+              <ListItemIcon>
+                <PersonOutlineIcon fontSize="small" />
+              </ListItemIcon>
+              Profile
+            </MenuItem>
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              Logout
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+
+      <Box
+        component="nav"
+        sx={{ width: { md: activeDrawerWidth }, flexShrink: { md: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            display: { xs: "block", md: "none" },
+            "& .MuiDrawer-paper": {
+              width: drawerWidth,
+              boxSizing: "border-box",
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+
+        <Drawer
+          variant="permanent"
+          open
+          sx={{
+            display: { xs: "none", md: "block" },
+            "& .MuiDrawer-paper": {
+              width: activeDrawerWidth,
+              boxSizing: "border-box",
+              borderRight: "1px solid",
+              borderColor: "divider",
+              bgcolor: alpha(theme.palette.background.paper, 0.78),
+              backdropFilter: "blur(8px)",
+              overflowX: "hidden",
+              transition: (theme) =>
+                theme.transitions.create("width", {
+                  easing: theme.transitions.easing.sharp,
+                  duration: theme.transitions.duration.shorter,
+                }),
+            },
+          }}
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          p: { xs: 2, sm: 3 },
+          mt: { xs: 8, sm: 9 },
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
