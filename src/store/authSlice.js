@@ -3,12 +3,14 @@ import api, { getApiErrorMessage } from "../services/api";
 import { API_URLS } from "../services/apiUrls";
 import {
   clearAuthSession,
+  getCompanyId,
   getRole,
   getToken,
   getUserProfile,
   isAuthenticated,
   normalizeRole,
   setAuthSession,
+  setCompanyId,
   updateStoredProfile,
 } from "../utils/roleHelper";
 
@@ -44,6 +46,7 @@ export const loginUser = createAsyncThunk(
           name: user.username,
           email: user.email,
           role: normalizedRole,
+          company_id: user.company_id || getCompanyId() || "",
         },
       };
 
@@ -53,7 +56,9 @@ export const loginUser = createAsyncThunk(
         name: payload.user.name,
         email: payload.user.email,
         id: payload.user.id,
+        companyId: payload.user.company_id,
       });
+      setCompanyId(payload.user.company_id);
 
       return payload;
     } catch (requestError) {
@@ -87,17 +92,19 @@ const authSlice = createSlice({
       state.error = action.payload;
     },
     updateProfile(state, action) {
-      const { name, email } = action.payload;
+      const { name, email, companyId } = action.payload;
       if (!state.user) return;
 
       state.user = {
         ...state.user,
         name,
         email,
+        ...(companyId !== undefined ? { company_id: companyId } : {}),
       };
       updateStoredProfile({
         name,
         email,
+        companyId,
       });
     },
   },

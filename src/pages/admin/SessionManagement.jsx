@@ -33,6 +33,7 @@ import PublishIcon from "@mui/icons-material/Publish";
 import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import Layout from "../../layouts/commonLayout/Layout";
 import { fetchCompanies } from "../../store/companySlice";
+import { fetchKpis } from "../../store/kpiSlice";
 import {
   addQuestionsToSession,
   clearSessionDetailError,
@@ -54,6 +55,7 @@ import {
   clearQuestionHierarchyError,
   fetchQuestionHierarchy,
 } from "../../store/questionHierarchySlice";
+import { clearThemeListError, fetchThemes } from "../../store/themeSlice";
 import { getSurfaceBackground } from "../../theme";
 
 const normalizeQuestion = (item, index) => ({
@@ -104,6 +106,11 @@ export default function SessionManagement() {
     error: companiesError,
   } = useSelector((state) => state.company);
   const {
+    items: themeItems,
+    listLoading: themeLoading,
+    listError: themeError,
+  } = useSelector((state) => state.theme);
+  const {
     items: questionHierarchy,
     loading: loadingQuestions,
     error: questionHierarchyError,
@@ -112,6 +119,9 @@ export default function SessionManagement() {
   const [selectedThemeKeys, setSelectedThemeKeys] = useState([]);
   const [selectedKpiKeys, setSelectedKpiKeys] = useState([]);
   const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [availableKpis, setAvailableKpis] = useState([]);
+  const [availableKpisLoading, setAvailableKpisLoading] = useState(false);
+  const [availableKpisError, setAvailableKpisError] = useState("");
   const [formError, setFormError] = useState("");
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
 
@@ -130,9 +140,108 @@ export default function SessionManagement() {
       dispatch(clearSessionDetails());
       dispatch(clearSessionPreview());
       dispatch(clearSessionQuestions());
+      dispatch(clearThemeListError());
       dispatch(clearQuestionHierarchyError());
     };
   }, [dispatch, sessionId]);
+
+  useEffect(() => {
+    if (!sessionDetails?.company_id) return;
+
+    dispatch(
+      fetchThemes({
+        isActive: true,
+        companyId: sessionDetails.company_id,
+      }),
+    );
+  }, [dispatch, sessionDetails?.company_id]);
+
+  useEffect(() => {
+    const sessionThemes = Array.isArray(sessionDetails?.themes)
+      ? sessionDetails.themes
+      : [];
+
+    if (!sessionThemes.length) return;
+
+    setSelectedThemeKeys(sessionThemes.map((theme) => theme.theme_key));
+
+    const sessionKpiKeys = sessionThemes.flatMap((theme) =>
+      Array.isArray(theme?.kpis)
+        ? theme.kpis.map((kpi) => kpi.kpi_key)
+        : [],
+    );
+    setSelectedKpiKeys(sessionKpiKeys);
+  }, [sessionDetails?.id, sessionDetails?.themes]);
+
+  useEffect(() => {
+    const companyId = sessionDetails?.company_id;
+
+    if (!companyId || !selectedThemeKeys.length) {
+      setAvailableKpis([]);
+      setAvailableKpisError("");
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadKpis = async () => {
+      setAvailableKpisLoading(true);
+      setAvailableKpisError("");
+
+      try {
+        const responses = await Promise.all(
+          selectedThemeKeys.map((themeKey) =>
+            dispatch(
+              fetchKpis({
+                skip: 0,
+                limit: 50,
+                isActive: true,
+                companyId,
+                themeKey,
+              }),
+            ).unwrap(),
+          ),
+        );
+
+        if (cancelled) return;
+
+        const mergedKpis = responses
+          .flatMap((response) => (Array.isArray(response.items) ? response.items : []))
+          .reduce((accumulator, item) => {
+            if (!accumulator.some((kpi) => kpi.kpi_key === item.kpi_key)) {
+              accumulator.push(item);
+            }
+            return accumulator;
+          }, []);
+
+        setAvailableKpis(mergedKpis);
+        setSelectedKpiKeys((current) =>
+          current.filter((kpiKey) =>
+            mergedKpis.some((kpi) => kpi.kpi_key === kpiKey),
+          ),
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setAvailableKpis([]);
+          setAvailableKpisError(
+            typeof error === "string"
+              ? error
+              : "Failed to fetch KPIs for the selected theme(s).",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setAvailableKpisLoading(false);
+        }
+      }
+    };
+
+    loadKpis();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, selectedThemeKeys, sessionDetails?.company_id]);
 
   const clearLocalAndReduxErrors = () => {
     if (formError) setFormError("");
@@ -155,18 +264,25 @@ export default function SessionManagement() {
     [questionHierarchy, selectedThemeKeys],
   );
 
+  const themeNameByKey = useMemo(
+    () =>
+      themeItems.reduce((accumulator, item) => {
+        accumulator[item.theme_key] = item.theme_display_name;
+        return accumulator;
+      }, {}),
+    [themeItems],
+  );
+
   const kpiOptions = useMemo(
     () =>
-      selectedThemes.flatMap((themeItem) =>
-        (Array.isArray(themeItem?.kpis) ? themeItem.kpis : []).map((kpi) => ({
+      availableKpis
+        .map((kpi) => ({
           ...kpi,
-          selectionKey: `${themeItem.theme_key}::${kpi.kpi_key}`,
-          themeKey: themeItem.theme_key,
+          selectionKey: kpi.kpi_key,
           themeDisplayName:
-            themeItem.theme_display_name || themeItem.theme_key,
+            themeNameByKey[kpi.theme_key] || kpi.theme_key || "Unknown Theme",
         })),
-      ),
-    [selectedThemes],
+    [availableKpis, themeNameByKey],
   );
 
   const questions = useMemo(() => {
@@ -175,7 +291,12 @@ export default function SessionManagement() {
     kpiOptions
       .filter((kpi) => selectedKpiKeys.includes(kpi.selectionKey))
       .forEach((kpi) => {
-        const rawQuestions = Array.isArray(kpi.questions) ? kpi.questions : [];
+        const themeItem = selectedThemes.find(
+          (theme) => theme.theme_key === kpi.theme_key,
+        );
+        const rawQuestions =
+          themeItem?.kpis?.find((item) => item.kpi_key === kpi.kpi_key)
+            ?.questions || [];
         rawQuestions.map(normalizeQuestion).forEach((question) => {
           if (!questionMap.has(question.id)) {
             questionMap.set(question.id, question);
@@ -184,11 +305,11 @@ export default function SessionManagement() {
       });
 
     return Array.from(questionMap.values());
-  }, [kpiOptions, selectedKpiKeys]);
+  }, [kpiOptions, selectedKpiKeys, selectedThemes]);
 
   const allThemeKeys = useMemo(
-    () => questionHierarchy.map((item) => item.theme_key),
-    [questionHierarchy],
+    () => themeItems.map((item) => item.theme_key),
+    [themeItems],
   );
   const allKpiKeys = useMemo(
     () => kpiOptions.map((item) => item.selectionKey),
@@ -217,7 +338,10 @@ export default function SessionManagement() {
       : value;
 
     setSelectedThemeKeys(nextThemeKeys);
-    setSelectedKpiKeys([]);
+    if (!nextThemeKeys.length) {
+      setSelectedKpiKeys([]);
+      setAvailableKpis([]);
+    }
     setSelectedQuestions([]);
   };
 
@@ -428,14 +552,14 @@ export default function SessionManagement() {
                 <Button
                   variant="outlined"
                   startIcon={<ArrowBackIcon />}
-                  onClick={() => navigate("/admin/sessions")}
+                  onClick={() => navigate("/super-admin/sessions")}
                 >
                   Back to Sessions
                 </Button>
                 <Button
                   variant="outlined"
                   startIcon={<EditIcon />}
-                  onClick={() => navigate(`/admin/sessions/${sessionId}/edit`)}
+                  onClick={() => navigate(`/super-admin/sessions/${sessionId}/edit`)}
                 >
                   Edit Session
                 </Button>
@@ -474,6 +598,10 @@ export default function SessionManagement() {
               {!!previewError && <Alert severity="error">{previewError}</Alert>}
               {!!publishError && <Alert severity="error">{publishError}</Alert>}
               {!!companiesError && <Alert severity="error">{companiesError}</Alert>}
+              {!!themeError && <Alert severity="error">{themeError}</Alert>}
+              {!!availableKpisError && (
+                <Alert severity="error">{availableKpisError}</Alert>
+              )}
               {!!questionHierarchyError && (
                 <Alert severity="error">{questionHierarchyError}</Alert>
               )}
@@ -493,11 +621,11 @@ export default function SessionManagement() {
                 Select themes and KPIs, then add, replace, or remove questions linked to this session.
               </Typography>
 
-              {loadingQuestions ? (
+              {loadingQuestions || themeLoading || availableKpisLoading ? (
                 <Stack direction="row" spacing={1} alignItems="center">
                   <CircularProgress size={16} />
                   <Typography variant="body2" color="text.secondary">
-                    Loading question list...
+                    Loading question data...
                   </Typography>
                 </Stack>
               ) : (
@@ -510,7 +638,7 @@ export default function SessionManagement() {
                       onChange={handleThemeSelectionChange}
                       renderValue={(selected) =>
                         selected.length
-                          ? questionHierarchy
+                          ? themeItems
                               .filter((themeItem) =>
                                 selected.includes(themeItem.theme_key),
                               )
@@ -527,7 +655,7 @@ export default function SessionManagement() {
                         <Checkbox checked={allThemesSelected} />
                         Select All Themes
                       </MenuItem>
-                      {questionHierarchy.map((themeItem) => (
+                      {themeItems.map((themeItem) => (
                         <MenuItem
                           key={themeItem.theme_key}
                           value={themeItem.theme_key}

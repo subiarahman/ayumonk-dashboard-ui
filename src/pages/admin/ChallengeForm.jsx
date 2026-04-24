@@ -21,6 +21,7 @@ import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import Layout from "../../layouts/commonLayout/Layout";
+import { fetchCompanies } from "../../store/companySlice";
 import { fetchKpiById, fetchKpis } from "../../store/kpiSlice";
 import {
   clearChallengeCreateState,
@@ -32,6 +33,7 @@ import {
   updateChallenge,
 } from "../../store/challengeSlice";
 import { getSurfaceBackground } from "../../theme";
+import { getCompanyId } from "../../utils/roleHelper";
 
 const CHALLENGE_ICON_OPTIONS = [
   { value: "🏆", label: "Trophy" },
@@ -64,11 +66,12 @@ const defaultMapping = () => ({
   endDate: "",
 });
 
-export default function ChallengeForm({ mode }) {
+export default function ChallengeForm({ mode, role = "superadmin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
+  const { companies } = useSelector((state) => state.company);
   const { items: kpiItems } = useSelector((state) => state.kpi);
   const {
     selectedChallenge,
@@ -80,6 +83,7 @@ export default function ChallengeForm({ mode }) {
     updateError,
   } = useSelector((state) => state.challenge);
   const [draftForm, setDraftForm] = useState({
+    companyId: "",
     name: "",
     challengeType: "",
     description: "",
@@ -94,7 +98,7 @@ export default function ChallengeForm({ mode }) {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    dispatch(fetchKpis({ isActive: true }));
+    dispatch(fetchCompanies());
     if (mode === "edit" && id) {
       dispatch(fetchChallengeById(id));
     }
@@ -104,6 +108,7 @@ export default function ChallengeForm({ mode }) {
     if (mode !== "edit" || !selectedChallenge) return;
 
     setDraftForm({
+      companyId: selectedChallenge.company_id || "",
       name: selectedChallenge.name || "",
       challengeType: selectedChallenge.challenge_type || "",
       description: selectedChallenge.description || "",
@@ -143,6 +148,7 @@ export default function ChallengeForm({ mode }) {
   const form = useMemo(() => {
     if (mode === "edit" && selectedChallenge && !hasStartedEditing) {
       return {
+        companyId: selectedChallenge.company_id || "",
         name: selectedChallenge.name || "",
         challengeType: selectedChallenge.challenge_type || "",
         description: selectedChallenge.description || "",
@@ -172,8 +178,25 @@ export default function ChallengeForm({ mode }) {
     return draftMappings;
   }, [draftMappings, hasStartedEditing, mode, selectedChallenge]);
 
+  const selectedCompanyId =
+    role === "superadmin" ? form.companyId : getCompanyId();
+
+  const filteredKpis = useMemo(
+    () =>
+      selectedCompanyId
+        ? kpiItems.filter((kpi) => kpi.company_id === selectedCompanyId)
+        : [],
+    [kpiItems, selectedCompanyId],
+  );
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      dispatch(fetchKpis({ isActive: true, companyId: selectedCompanyId }));
+    }
+  }, [dispatch, selectedCompanyId]);
+
   const getKpiDatesFromList = (kpiKey) => {
-    const selectedKpi = kpiItems.find((item) => item.kpi_key === kpiKey);
+    const selectedKpi = filteredKpis.find((item) => item.kpi_key === kpiKey);
 
     return {
       startDate: selectedKpi?.start_date || "",
@@ -211,6 +234,11 @@ export default function ChallengeForm({ mode }) {
       return;
     }
 
+    if (role === "superadmin" && !selectedCompanyId) {
+      setFormError("Company is required.");
+      return;
+    }
+
     if (!mappings.length) {
       setFormError("Add at least one KPI mapping.");
       return;
@@ -236,6 +264,7 @@ export default function ChallengeForm({ mode }) {
         await dispatch(
           updateChallenge({
             challengeKey: id,
+            companyId: selectedCompanyId || undefined,
             name: form.name.trim(),
             challengeType: form.challengeType.trim(),
             description: form.description.trim(),
@@ -265,6 +294,7 @@ export default function ChallengeForm({ mode }) {
 
       await dispatch(
         createChallenge({
+          companyId: selectedCompanyId || undefined,
           name: form.name.trim(),
           challengeType: form.challengeType.trim(),
           description: form.description.trim(),
@@ -406,6 +436,30 @@ export default function ChallengeForm({ mode }) {
           )}
 
           <Stack spacing={2}>
+            {role === "superadmin" && (
+              <TextField
+                label="Company"
+                select
+                value={form.companyId}
+                onChange={(event) => {
+                  setFormError("");
+                setHasStartedEditing(true);
+                setDraftForm((current) => ({
+                  ...current,
+                  companyId: event.target.value,
+                }));
+                setDraftMappings([defaultMapping()]);
+              }}
+                fullWidth
+              >
+                <MenuItem value="">Select Company</MenuItem>
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.company_name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField
               label="Challenge Name"
               value={form.name}
@@ -680,13 +734,16 @@ export default function ChallengeForm({ mode }) {
                       label="KPI"
                       select
                       value={mapping.kpiKey}
+                      disabled={!selectedCompanyId}
                       onChange={(event) =>
                         handleMappingKpiChange(mapping.localId, event.target.value)
                       }
                       fullWidth
                     >
-                      <MenuItem value="">Select KPI</MenuItem>
-                      {kpiItems.map((kpi) => (
+                      <MenuItem value="">
+                        {selectedCompanyId ? "Select KPI" : "Select a company first"}
+                      </MenuItem>
+                      {filteredKpis.map((kpi) => (
                         <MenuItem key={kpi.kpi_key} value={kpi.kpi_key}>
                           {kpi.display_name}
                         </MenuItem>

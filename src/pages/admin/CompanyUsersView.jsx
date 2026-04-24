@@ -17,8 +17,9 @@ import { fetchCompanies } from "../../store/companySlice";
 import { clearUserDetailState, fetchUserById } from "../../store/userSlice";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
+import { getCompanyId } from "../../utils/roleHelper";
 
-export default function CompanyUsersView() {
+export default function CompanyUsersView({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -38,13 +39,20 @@ export default function CompanyUsersView() {
   }, [dispatch, id]);
 
   const companyName = useMemo(
-    () => companies.find((company) => company.id === selectedUser?.company_id)?.company_name,
-    [companies, selectedUser?.company_id],
+    () => {
+      const resolved = companies.find((company) => company.id === selectedUser?.company_id)?.company_name;
+      if (resolved) return resolved;
+      if (role === "admin") return companies.find((company) => company.id === getCompanyId())?.company_name || "";
+      return selectedUser?.company_id || "";
+    },
+    [companies, role, selectedUser?.company_id],
   );
+
+  const backPath = role === "admin" ? "/admin/company-users" : "/super-admin/company-users";
 
   if (detailLoading) {
     return (
-      <Layout role="admin" title="View User">
+      <Layout role={role} title="View User">
         <Paper
           elevation={0}
           sx={{
@@ -62,7 +70,7 @@ export default function CompanyUsersView() {
   }
 
   return (
-    <Layout role="admin" title="View User">
+    <Layout role={role} title="View User">
       <Paper
         elevation={0}
         sx={{
@@ -88,16 +96,19 @@ export default function CompanyUsersView() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            <Button
-              startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate("/admin/company-users")}
-            >
+            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(backPath)}>
               Back to list
             </Button>
             <Button
               variant="contained"
               startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/admin/company-users/${id}/edit`)}
+              onClick={() =>
+                navigate(
+                  role === "admin"
+                    ? `/admin/company-users/${id}/edit`
+                    : `/super-admin/company-users/${id}/edit`,
+                )
+              }
             >
               Edit
             </Button>
@@ -128,14 +139,8 @@ export default function CompanyUsersView() {
               ["Email", selectedUser.email],
               ["Company", companyName || selectedUser.company_id],
               ["Status", selectedUser.is_active ? "Active" : "Inactive"],
-              [
-                "Created At",
-                formatDateTimeIST(selectedUser.created_at),
-              ],
-              [
-                "Updated At",
-                formatDateTimeIST(selectedUser.updated_at),
-              ],
+              ["Created At", formatDateTimeIST(selectedUser.created_at)],
+              ["Updated At", formatDateTimeIST(selectedUser.updated_at)],
             ].map(([label, value]) => (
               <Paper key={label} variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
                 <Typography variant="caption" color="text.secondary">

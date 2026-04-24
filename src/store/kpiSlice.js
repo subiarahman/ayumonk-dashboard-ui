@@ -26,6 +26,7 @@ const initialState = {
 const normalizeKpi = (item, index = 0) => ({
   id: String(item?.kpi_key || index),
   kpi_key: String(item?.kpi_key || index),
+  company_id: String(item?.company_id || ""),
   display_name: item?.display_name || "Untitled KPI",
   theme_key: item?.theme_key || "",
   domain_category: item?.domain_category || "",
@@ -42,7 +43,10 @@ const normalizeKpi = (item, index = 0) => ({
 
 export const fetchKpis = createAsyncThunk(
   "kpi/fetchKpis",
-  async ({ skip = 0, limit = 50, search = "", isActive } = {}, { rejectWithValue }) => {
+  async (
+    { skip = 0, limit = 50, search = "", isActive, companyId, themeKey } = {},
+    { rejectWithValue },
+  ) => {
     try {
       const response = await api.get(API_URLS.kpis, {
         params: {
@@ -50,6 +54,8 @@ export const fetchKpis = createAsyncThunk(
           limit,
           ...(search ? { search } : {}),
           ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+          ...(companyId ? { company_id: companyId } : {}),
+          ...(themeKey ? { theme_key: themeKey } : {}),
         },
       });
 
@@ -78,7 +84,15 @@ export const fetchKpis = createAsyncThunk(
 export const createKpi = createAsyncThunk(
   "kpi/createKpi",
   async (
-    { displayName, themeKey, domainCategory = "", wiWeight = null, startDate, endDate },
+    {
+      displayName,
+      themeKey,
+      domainCategory = "",
+      wiWeight = null,
+      startDate,
+      endDate,
+      companyId,
+    },
     { rejectWithValue },
   ) => {
     try {
@@ -89,6 +103,7 @@ export const createKpi = createAsyncThunk(
         wi_weight: wiWeight,
         start_date: startDate,
         end_date: endDate,
+        ...(companyId ? { company_id: companyId } : {}),
       });
 
       const payload = response?.data || {};
@@ -140,6 +155,7 @@ export const updateKpi = createAsyncThunk(
       startDate,
       endDate,
       isActive,
+      companyId,
     },
     { rejectWithValue },
   ) => {
@@ -152,6 +168,7 @@ export const updateKpi = createAsyncThunk(
         start_date: startDate,
         end_date: endDate,
         is_active: isActive,
+        ...(companyId ? { company_id: companyId } : {}),
       });
 
       const payload = response?.data || {};

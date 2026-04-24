@@ -19,6 +19,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import { fetchCompanies } from "../../store/companySlice";
 import { fetchThemes } from "../../store/themeSlice";
 import { fetchKpis } from "../../store/kpiSlice";
 import {
@@ -30,6 +31,7 @@ import {
   updateQuestion,
 } from "../../store/questionSlice";
 import { getSurfaceBackground } from "../../theme";
+import { getCompanyId } from "../../utils/roleHelper";
 
 const createEmptyOption = (index) => ({
   option_number: index + 1,
@@ -38,6 +40,7 @@ const createEmptyOption = (index) => ({
 });
 
 const emptyForm = {
+  company_id: "",
   theme_key: "",
   kpi_key: "",
   question_code: "",
@@ -46,11 +49,12 @@ const emptyForm = {
   options: [createEmptyOption(0), createEmptyOption(1)],
 };
 
-export default function QuestionWorkflowForm({ mode }) {
+export default function QuestionWorkflowForm({ mode, role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
+  const { companies: companyItems = [] } = useSelector((state) => state.company) || {};
   const { items: themeItems } = useSelector((state) => state.theme);
   const { items: kpiItems } = useSelector((state) => state.kpi);
   const {
@@ -66,8 +70,7 @@ export default function QuestionWorkflowForm({ mode }) {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    dispatch(fetchThemes({ isActive: true }));
-    dispatch(fetchKpis({ isActive: true }));
+    dispatch(fetchCompanies());
 
     if (mode === "edit" && id) {
       dispatch(fetchQuestionById(id));
@@ -83,6 +86,7 @@ export default function QuestionWorkflowForm({ mode }) {
   useEffect(() => {
     if (mode === "edit" && selectedQuestion) {
       setForm({
+        company_id: selectedQuestion.company_id || "",
         theme_key: selectedQuestion.theme_key || "",
         kpi_key: selectedQuestion.kpi_key || "",
         question_code: selectedQuestion.question_code || "",
@@ -104,11 +108,36 @@ export default function QuestionWorkflowForm({ mode }) {
     () =>
       form.theme_key
         ? kpiItems.filter((item) => item.theme_key === form.theme_key)
-        : kpiItems,
+        : [],
     [form.theme_key, kpiItems],
   );
 
+  const selectedCompanyId = useMemo(
+    () => (role === "superadmin" ? form.company_id : getCompanyId()),
+    [form.company_id, role],
+  );
+
+  const resolvedCompanyId = useMemo(
+    () => selectedCompanyId,
+    [selectedCompanyId],
+  );
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      dispatch(fetchThemes({ isActive: true, companyId: selectedCompanyId }));
+    }
+  }, [dispatch, selectedCompanyId]);
+
+  useEffect(() => {
+    if (selectedCompanyId) {
+      dispatch(fetchKpis({ isActive: true, companyId: selectedCompanyId }));
+    }
+  }, [dispatch, selectedCompanyId]);
+
   const validate = () => {
+    if (role === "superadmin" && !resolvedCompanyId) {
+      return "Company is required.";
+    }
     if (!form.theme_key || !form.kpi_key) {
       return "Theme and KPI are required.";
     }
@@ -142,6 +171,7 @@ export default function QuestionWorkflowForm({ mode }) {
     setFormError("");
 
     const payload = {
+      companyId: resolvedCompanyId || undefined,
       theme_key: form.theme_key,
       kpi_key: form.kpi_key,
       question_code: form.question_code.trim(),
@@ -156,9 +186,9 @@ export default function QuestionWorkflowForm({ mode }) {
 
     try {
       if (mode === "edit") {
-        await dispatch(updateQuestion({ questionId: id, question: payload })).unwrap();
+        await dispatch(updateQuestion({ questionId: id, question: payload, companyId: resolvedCompanyId || undefined })).unwrap();
       } else {
-        await dispatch(createQuestion(payload)).unwrap();
+        await dispatch(createQuestion({ ...payload, companyId: resolvedCompanyId || undefined })).unwrap();
       }
 
       navigate("/admin/questions", {
@@ -238,10 +268,36 @@ export default function QuestionWorkflowForm({ mode }) {
           gap: 2,
         }}
       >
+        {role === "superadmin" && (
+          <TextField
+            label="Company"
+            select
+            value={form.company_id}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                company_id: event.target.value,
+                theme_key: "",
+                kpi_key: "",
+              }))
+            }
+            fullWidth
+            sx={{ gridColumn: "1 / -1" }}
+          >
+            <MenuItem value="">Select Company</MenuItem>
+            {companyItems.map((company) => (
+              <MenuItem key={company.id} value={company.id}>
+                {company.company_name}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
+
         <TextField
           label="Theme"
           select
           value={form.theme_key}
+          disabled={role === "superadmin" && !selectedCompanyId}
           onChange={(event) =>
             setForm((current) => ({
               ...current,
@@ -259,7 +315,11 @@ export default function QuestionWorkflowForm({ mode }) {
           }
           fullWidth
         >
-          <MenuItem value="">Select Theme</MenuItem>
+          <MenuItem value="">
+            {role === "superadmin" && !selectedCompanyId
+              ? "Select a company first"
+              : "Select Theme"}
+          </MenuItem>
           {themeItems.map((item) => (
             <MenuItem key={item.theme_key} value={item.theme_key}>
               {item.theme_display_name}
@@ -271,12 +331,15 @@ export default function QuestionWorkflowForm({ mode }) {
           label="KPI"
           select
           value={form.kpi_key}
+          disabled={!form.theme_key}
           onChange={(event) =>
             setForm((current) => ({ ...current, kpi_key: event.target.value }))
           }
           fullWidth
         >
-          <MenuItem value="">Select KPI</MenuItem>
+          <MenuItem value="">
+            {form.theme_key ? "Select KPI" : "Select a theme first"}
+          </MenuItem>
           {filteredKpis.map((item) => (
             <MenuItem key={item.kpi_key} value={item.kpi_key}>
               {item.display_name}

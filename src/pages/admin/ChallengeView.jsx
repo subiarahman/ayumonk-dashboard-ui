@@ -15,6 +15,7 @@ import { alpha } from "@mui/material/styles";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import Layout from "../../layouts/commonLayout/Layout";
+import { fetchCompanies } from "../../store/companySlice";
 import { fetchKpis } from "../../store/kpiSlice";
 import {
   clearChallengeDetailState,
@@ -22,18 +23,19 @@ import {
 } from "../../store/challengeSlice";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
-export default function ChallengeView() {
+export default function ChallengeView({ role = "superadmin" }) {
   const dispatch = useDispatch();
   const theme = useTheme();
   const navigate = useNavigate();
   const { id } = useParams();
+  const { companies } = useSelector((state) => state.company);
   const { items: kpiItems } = useSelector((state) => state.kpi);
   const { selectedChallenge, detailLoading, detailError } = useSelector(
     (state) => state.challenge,
   );
 
   useEffect(() => {
-    dispatch(fetchKpis({ isActive: true }));
+    dispatch(fetchCompanies());
     if (id) {
       dispatch(fetchChallengeById(id));
     }
@@ -56,6 +58,24 @@ export default function ChallengeView() {
           `Mapping ${index + 1}`,
       })),
     [kpiItems, selectedChallenge?.kpi_mappings],
+  );
+
+  useEffect(() => {
+    if (selectedChallenge?.company_id) {
+      dispatch(
+        fetchKpis({
+          isActive: true,
+          companyId: selectedChallenge.company_id,
+        }),
+      );
+    }
+  }, [dispatch, selectedChallenge?.company_id]);
+
+  const companyName = useMemo(
+    () =>
+      companies.find((company) => company.id === selectedChallenge?.company_id)
+        ?.company_name || selectedChallenge?.company_id || "-",
+    [companies, selectedChallenge?.company_id],
   );
 
   return (
@@ -117,6 +137,14 @@ export default function ChallengeView() {
                 gap: 2,
               }}
             >
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  Company
+                </Typography>
+                <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                  {companyName}
+                </Typography>
+              </Paper>
               <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
                 <Typography variant="caption" color="text.secondary">
                   Challenge Name

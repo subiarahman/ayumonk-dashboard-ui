@@ -37,7 +37,7 @@ const filterFieldSx = {
   },
 };
 
-export default function Themes() {
+export default function Themes({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -67,8 +67,13 @@ export default function Themes() {
       : appliedFilters.status === "active";
 
   useEffect(() => {
-    dispatch(fetchThemes({ search: appliedFilters.search.trim(), isActive }));
-  }, [appliedFilters.search, dispatch, isActive]);
+    dispatch(
+      fetchThemes({
+        search: appliedFilters.search.trim(),
+        isActive: role === "admin" ? true : isActive,
+      }),
+    );
+  }, [appliedFilters.search, dispatch, isActive, role]);
 
   useEffect(() => {
     return () => {
@@ -78,13 +83,24 @@ export default function Themes() {
   }, [dispatch]);
 
   const handleRefresh = () => {
-    dispatch(fetchThemes({ search: appliedFilters.search.trim(), isActive }));
+    dispatch(
+      fetchThemes({
+        search: appliedFilters.search.trim(),
+        isActive: role === "admin" ? true : isActive,
+      }),
+    );
   };
 
   const handleDelete = useCallback(async (themeKey) => {
     try {
+      if (role !== "superadmin") return;
       await dispatch(deleteTheme(themeKey)).unwrap();
-      dispatch(fetchThemes({ search: appliedFilters.search.trim(), isActive }));
+      dispatch(
+        fetchThemes({
+          search: appliedFilters.search.trim(),
+          isActive: role === "admin" ? true : isActive,
+        }),
+      );
     } catch {
       // Error is already handled in redux state.
     }
@@ -105,7 +121,12 @@ export default function Themes() {
 
     setFilters(defaultFilters);
     setAppliedFilters(defaultFilters);
-    dispatch(fetchThemes({ search: "", isActive: undefined }));
+    dispatch(
+      fetchThemes({
+        search: "",
+        isActive: role === "admin" ? true : undefined,
+      }),
+    );
   };
 
   const columns = useMemo(
@@ -171,40 +192,52 @@ export default function Themes() {
             <Tooltip title="View">
               <IconButton
                 size="small"
-                onClick={() => navigate(`/admin/themes/${row.theme_key}`)}
+                onClick={() =>
+                  navigate(
+                    role === "admin"
+                      ? `/admin/themes/${row.theme_key}`
+                      : `/super-admin/themes/${row.theme_key}`,
+                  )
+                }
               >
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/admin/themes/${row.theme_key}/edit`)}
-              >
-                <EditRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <span>
-                <IconButton
-                  size="small"
-                  color="error"
-                  disabled={deleteLoading}
-                  onClick={() => handleDelete(row.theme_key)}
-                >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
-                </IconButton>
-              </span>
-            </Tooltip>
+            {role === "superadmin" && (
+              <>
+                <Tooltip title="Edit">
+                  <IconButton
+                    size="small"
+                    onClick={() =>
+                      navigate(`/super-admin/themes/${row.theme_key}/edit`)
+                    }
+                  >
+                    <EditRoundedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Delete">
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={deleteLoading}
+                      onClick={() => handleDelete(row.theme_key)}
+                    >
+                      <DeleteOutlineRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </>
+            )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDelete, navigate],
+    [deleteLoading, handleDelete, navigate, role],
   );
 
   return (
-    <Layout role="admin" title="Theme Master">
+    <Layout role={role} title="Theme Master">
       <Stack spacing={2}>
         {feedback && <Alert severity={feedback.severity}>{feedback.message}</Alert>}
         {listError && <Alert severity="error">{listError}</Alert>}
@@ -237,13 +270,15 @@ export default function Themes() {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Button
-                variant="contained"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => navigate("/admin/themes/add")}
-              >
-                Add Theme
-              </Button>
+              {role === "superadmin" && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddRoundedIcon />}
+                  onClick={() => navigate("/super-admin/themes/add")}
+                >
+                  Add Theme
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<RefreshRoundedIcon />}
@@ -297,21 +332,25 @@ export default function Themes() {
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="inactive">Inactive</MenuItem>
             </TextField>
-            <Button
-              variant="outlined"
-              onClick={handleApplyFilters}
-              disabled={listLoading}
-              sx={{ minHeight: 56, px: 3, whiteSpace: "nowrap" }}
-            >
-              Apply Filters
-            </Button>
-            <Button
-              variant="text"
-              onClick={handleResetFilters}
-              sx={{ minHeight: 56, px: 2, whiteSpace: "nowrap" }}
-            >
-              Reset
-            </Button>
+            {role === "superadmin" ? (
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={handleApplyFilters}
+                  disabled={listLoading}
+                  sx={{ minHeight: 56, px: 3, whiteSpace: "nowrap" }}
+                >
+                  Apply Filters
+                </Button>
+                <Button
+                  variant="text"
+                  onClick={handleResetFilters}
+                  sx={{ minHeight: 56, px: 2, whiteSpace: "nowrap" }}
+                >
+                  Reset
+                </Button>
+              </>
+            ) : null}
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

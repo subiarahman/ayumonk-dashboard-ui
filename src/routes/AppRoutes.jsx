@@ -99,6 +99,102 @@ export default function AppRoutes() {
         }
       />
       <Route
+        path="/admin/company-details"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <CompanyDataForm mode="edit" role="admin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company-users"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <CompanyUsers role="admin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company-users/:id"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <CompanyUsersView role="admin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/company-users/:id/edit"
+        element={
+          <ProtectedRoute allowedRole="admin">
+            <CompanyUsersForm mode="edit" role="admin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/themes"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <Themes role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/themes/:id"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <ThemeView role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/kpis"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <Kpis role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/kpis/:id"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <KpiView role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/challenges"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <Challenges role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/challenges/:id"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <ChallengeView role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/questions"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <Questions role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/questions/:id"
+        element={
+          <ProtectedRoute allowedRole="superadmin">
+            <QuestionsView role="superadmin" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/super-admin/company-data"
         element={
           <ProtectedRoute allowedRole="superadmin">
@@ -131,197 +227,210 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/admin/company-users"
+        path="/super-admin/company-users"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <CompanyUsers />
+          <ProtectedRoute allowedRole="superadmin">
+            <CompanyUsers role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/company-users/add"
+        path="/super-admin/company-users/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <CompanyUsersForm mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <CompanyUsersForm mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/company-users/:id"
+        path="/super-admin/company-users/:id"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <CompanyUsersView />
+          <ProtectedRoute allowedRole="superadmin">
+            <CompanyUsersView role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/company-users/:id/edit"
+        path="/super-admin/company-users/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <CompanyUsersForm mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <CompanyUsersForm mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/questions"
+        path="/super-admin/questions"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <Questions />
+          <ProtectedRoute allowedRole="superadmin">
+            <Questions role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/questions/add"
+        path="/super-admin/questions/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <QuestionsForm mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <QuestionsForm mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/questions/:id"
+        path="/super-admin/questions/:id"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <QuestionsView />
+          <ProtectedRoute allowedRole="superadmin">
+            <QuestionsView role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/questions/:id/edit"
+        path="/super-admin/questions/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <QuestionsForm mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <QuestionsForm mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/themes"
+        path="/super-admin/themes"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <Themes />
+          <ProtectedRoute allowedRole="superadmin">
+            <Themes role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/themes/add"
+        path="/super-admin/themes/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ThemeForm mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <ThemeForm mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/themes/:id"
+        path="/super-admin/themes/:id"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ThemeView />
+          <ProtectedRoute allowedRole="superadmin">
+            <ThemeView role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/themes/:id/edit"
+        path="/super-admin/themes/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ThemeForm mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <ThemeForm mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/kpis"
+        path="/super-admin/kpis"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <Kpis />
+          <ProtectedRoute allowedRole="superadmin">
+            <Kpis role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/kpis/add"
+        path="/super-admin/kpis/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <KpiForm mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <KpiForm mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/kpis/:id"
+        path="/super-admin/kpis/:id"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <KpiView />
+          <ProtectedRoute allowedRole="superadmin">
+            <KpiView role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/kpis/:id/edit"
+        path="/super-admin/kpis/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <KpiForm mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <KpiForm mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/challenges"
+        path="/super-admin/challenges"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <Challenges />
+          <ProtectedRoute allowedRole="superadmin">
+            <Challenges role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/challenges/add"
+        path="/super-admin/challenges/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ChallengeForm mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <ChallengeForm mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/challenges/:id"
+        path="/super-admin/challenges/:id"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ChallengeView />
+          <ProtectedRoute allowedRole="superadmin">
+            <ChallengeView role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/challenges/:id/edit"
+        path="/super-admin/challenges/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <ChallengeForm mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <ChallengeForm mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/sessions"
+        path="/super-admin/sessions"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <Sessions />
+          <ProtectedRoute allowedRole="superadmin">
+            <Sessions role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/sessions/add"
+        path="/super-admin/sessions/add"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <SessionEditor mode="add" />
+          <ProtectedRoute allowedRole="superadmin">
+            <SessionEditor mode="add" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/sessions/:id/edit"
+        path="/super-admin/sessions/:id/edit"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <SessionEditor mode="edit" />
+          <ProtectedRoute allowedRole="superadmin">
+            <SessionEditor mode="edit" role="superadmin" />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/admin/sessions/:id/manage"
+        path="/super-admin/sessions/:id/manage"
         element={
-          <ProtectedRoute allowedRole="admin">
-            <SessionManagement />
+          <ProtectedRoute allowedRole="superadmin">
+            <SessionManagement role="superadmin" />
           </ProtectedRoute>
         }
       />
+      <Route path="/admin/company-users/add" element={<Navigate to="/admin/company-users" replace />} />
+      <Route path="/admin/themes/add" element={<Navigate to="/admin/themes" replace />} />
+      <Route path="/admin/themes/:id/edit" element={<Navigate to="/admin/themes" replace />} />
+      <Route path="/admin/kpis/add" element={<Navigate to="/admin/kpis" replace />} />
+      <Route path="/admin/kpis/:id/edit" element={<Navigate to="/admin/kpis" replace />} />
+      <Route path="/admin/challenges/add" element={<Navigate to="/admin/challenges" replace />} />
+      <Route path="/admin/challenges/:id/edit" element={<Navigate to="/admin/challenges" replace />} />
+      <Route path="/admin/sessions" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/sessions/add" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/sessions/:id/edit" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/sessions/:id/manage" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/questions/add" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/questions/:id/edit" element={<Navigate to="/admin/dashboard" replace />} />
       <Route
         path="/super-admin/dashboard"
         element={

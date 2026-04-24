@@ -1,15 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Alert, Box, Button, CircularProgress, Paper, Stack, TextField, Typography } from "@mui/material";
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate, useParams } from "react-router-dom";
 import Layout from "../../layouts/commonLayout/Layout";
-import { clearSessionDetailError, clearSessionError, clearSessionMessages, createSession, fetchSessionById, resetSessionFlow, updateSession } from "../../store/sessionSlice";
-import api, { getApiErrorMessage } from "../../services/api";
-import { API_URLS } from "../../services/apiUrls";
+import { fetchCompanies } from "../../store/companySlice";
+import {
+  clearSessionDetailError,
+  clearSessionError,
+  clearSessionMessages,
+  createSession,
+  fetchSessionById,
+  resetSessionFlow,
+  updateSession,
+} from "../../store/sessionSlice";
 import { getSurfaceBackground } from "../../theme";
+import { getCompanyId } from "../../utils/roleHelper";
 
-export default function SessionEditor({ mode }) {
+export default function SessionEditor({ mode, role = "superadmin" }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const theme = useTheme();
@@ -26,70 +44,55 @@ export default function SessionEditor({ mode }) {
     detailError,
     sessionDetails,
   } = useSelector((state) => state.session);
+  const { companies } = useSelector((state) => state.company);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [formError, setFormError] = useState("");
-  const [companyMe, setCompanyMe] = useState(null);
-  const [companyError, setCompanyError] = useState("");
+  const fallbackCompanyId = getCompanyId();
 
   useEffect(() => {
     if (mode === "add") {
       dispatch(resetSessionFlow());
     }
 
+    dispatch(fetchCompanies());
     dispatch(clearSessionMessages());
     dispatch(clearSessionError());
     dispatch(clearSessionDetailError());
-
-    let isMounted = true;
-    const fetchCompanyMe = async () => {
-      try {
-        const response = await api.get(API_URLS.companyMe);
-        const payload = response?.data || {};
-        if (!payload?.success || !payload?.data) {
-          throw new Error(payload?.message || "Failed to fetch company details.");
-        }
-        if (isMounted) {
-          setCompanyMe(payload.data);
-          setCompanyError("");
-        }
-      } catch (error) {
-        if (isMounted) {
-          setCompanyMe(null);
-          setCompanyError(
-            getApiErrorMessage(error, "Failed to fetch company details."),
-          );
-        }
-      }
-    };
-
-    fetchCompanyMe();
 
     if (mode === "edit" && id) {
       dispatch(fetchSessionById(id));
     }
 
-    return () => {
-      isMounted = false;
-    };
+    return undefined;
   }, [dispatch, id, mode]);
 
   useEffect(() => {
-    if (mode === "edit" && sessionDetails && String(sessionDetails.id) === String(id)) {
+    if (
+      mode === "edit" &&
+      sessionDetails &&
+      String(sessionDetails.id) === String(id)
+    ) {
       setTitle(sessionDetails.title || "");
       setDescription(sessionDetails.description || "");
+      setCompanyId(sessionDetails.company_id || fallbackCompanyId || "");
     }
-  }, [id, mode, sessionDetails]);
+  }, [fallbackCompanyId, id, mode, sessionDetails]);
 
   const heading = useMemo(
     () => (mode === "edit" ? "Edit Session" : "Add Session"),
     [mode],
   );
   const activeSession = mode === "add" ? createdSession : sessionDetails;
+  const selectedCompanyId = role === "admin" ? fallbackCompanyId : companyId;
   const selectedCompanyName = useMemo(
-    () => companyMe?.company_name || activeSession?.company_id || "",
-    [activeSession?.company_id, companyMe?.company_name],
+    () =>
+      companies.find(
+        (company) => company.id === (activeSession?.company_id || selectedCompanyId),
+      )?.company_name || activeSession?.company_id || selectedCompanyId || "",
+    [activeSession?.company_id, companies, selectedCompanyId],
   );
 
   const handleSubmit = async () => {
@@ -101,8 +104,10 @@ export default function SessionEditor({ mode }) {
       setFormError("Title and description are required.");
       return;
     }
-    if (!companyMe?.id) {
-      setFormError("Company details are unavailable. Please refresh and try again.");
+    if (!selectedCompanyId) {
+      setFormError(
+        "Company details are unavailable. Please refresh and try again.",
+      );
       return;
     }
 
@@ -115,16 +120,16 @@ export default function SessionEditor({ mode }) {
             sessionId: id,
             title: title.trim(),
             description: description.trim(),
-            companyId: companyMe.id,
+            companyId: selectedCompanyId,
           }),
         ).unwrap();
-        navigate("/admin/sessions", { replace: true });
+        navigate("/super-admin/sessions", { replace: true });
       } else {
         await dispatch(
           createSession({
             title: title.trim(),
             description: description.trim(),
-            companyId: companyMe.id,
+            companyId: selectedCompanyId,
           }),
         ).unwrap();
       }
@@ -166,30 +171,63 @@ export default function SessionEditor({ mode }) {
           {detailLoading && mode === "edit" && (
             <Stack direction="row" spacing={1} alignItems="center">
               <CircularProgress size={18} />
-              <Typography variant="body2">Loading session details...</Typography>
+              <Typography variant="body2">
+                Loading session details...
+              </Typography>
             </Stack>
           )}
 
           {!!formError && <Alert severity="error">{formError}</Alert>}
-          {!!companyError && <Alert severity="error">{companyError}</Alert>}
           {!!sessionError && <Alert severity="error">{sessionError}</Alert>}
           {!!updateError && <Alert severity="error">{updateError}</Alert>}
           {!!detailError && <Alert severity="error">{detailError}</Alert>}
           {!!createMessage && <Alert severity="success">{createMessage}</Alert>}
           {!!updateMessage && <Alert severity="success">{updateMessage}</Alert>}
 
-          <TextField label="Session Title" value={title} onChange={(event) => setTitle(event.target.value)} fullWidth disabled={mode === "add" && Boolean(createdSession?.id)} />
-          <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} fullWidth multiline minRows={4} disabled={mode === "add" && Boolean(createdSession?.id)} />
+          <TextField
+            label="Session Title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            fullWidth
+            disabled={mode === "add" && Boolean(createdSession?.id)}
+          />
+          <TextField
+            label="Description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            fullWidth
+            multiline
+            minRows={4}
+            disabled={mode === "add" && Boolean(createdSession?.id)}
+          />
 
           <TextField
             label="Company"
-            value={companyMe?.company_name || ""}
+            select
+            value={selectedCompanyId || ""}
+            onChange={(event) => setCompanyId(event.target.value)}
             fullWidth
-            disabled
-          />
+            disabled={role === "admin"}
+          >
+            <MenuItem value="">Select Company</MenuItem>
+            {companies.map((company) => (
+              <MenuItem key={company.id} value={company.id}>
+                {company.company_name}
+              </MenuItem>
+            ))}
+          </TextField>
 
           <Stack direction="row" spacing={1.2} flexWrap="wrap" useFlexGap>
-            <Button variant="contained" onClick={handleSubmit} disabled={createLoading || updateLoading || detailLoading || (mode === "add" && Boolean(createdSession?.id))}>
+            <Button
+              variant="contained"
+              onClick={handleSubmit}
+              disabled={
+                createLoading ||
+                updateLoading ||
+                detailLoading ||
+                (mode === "add" && Boolean(createdSession?.id))
+              }
+            >
               {createLoading || updateLoading
                 ? mode === "edit"
                   ? "Saving..."
@@ -200,7 +238,10 @@ export default function SessionEditor({ mode }) {
                     ? "Session Created"
                     : "Create Session"}
             </Button>
-            <Button variant="outlined" onClick={() => navigate("/admin/sessions")}>
+            <Button
+              variant="outlined"
+              onClick={() => navigate("/super-admin/sessions")}
+            >
               Cancel
             </Button>
             {mode === "add" && createdSession?.id && (
@@ -208,7 +249,9 @@ export default function SessionEditor({ mode }) {
                 <Button
                   variant="outlined"
                   color="secondary"
-                  onClick={() => navigate(`/admin/sessions/${createdSession.id}/manage`)}
+                  onClick={() =>
+                    navigate(`/super-admin/sessions/${createdSession.id}/manage`)
+                  }
                 >
                   Add Questions
                 </Button>
@@ -230,19 +273,24 @@ export default function SessionEditor({ mode }) {
                   Session Summary
                 </Typography>
                 <Alert severity="info">
-                  Session created successfully. Continue to add questions for this session.
+                  Session created successfully. Continue to add questions for
+                  this session.
                 </Alert>
                 <Box>
                   <Typography variant="body2" color="text.secondary">
                     Title
                   </Typography>
-                  <Typography>{createdSession.title || title || "-"}</Typography>
+                  <Typography>
+                    {createdSession.title || title || "-"}
+                  </Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">
                     Description
                   </Typography>
-                  <Typography>{createdSession.description || description || "-"}</Typography>
+                  <Typography>
+                    {createdSession.description || description || "-"}
+                  </Typography>
                 </Box>
                 <Box>
                   <Typography variant="body2" color="text.secondary">

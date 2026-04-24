@@ -1020,7 +1020,44 @@ export default function Dashboard() {
       hasQuestionScore: triggerModes.has("question_score"),
     };
   }, [suggestionItems]);
+const latestResponse = useMemo(() => {
+  return mySubmissions?.[0]?.responses?.[0] || null;
+}, [mySubmissions]);
 
+const dynamicWellnessData = useMemo(() => {
+  if (!latestResponse) return [];
+
+  return latestResponse.kpi_scores.map((kpi, index) => ({
+    name: kpi.kpi_name,
+    value: Number((kpi.average_score * 20).toFixed(1)), // convert 0–5 → %
+    rawScore: kpi.average_score,
+    color: getMetricColor(index),
+  }));
+}, [latestResponse]);
+
+const overallWellnessScore = useMemo(() => {
+  if (!latestResponse) return 0;
+
+  const scores = latestResponse.kpi_scores.map(k => k.average_score);
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+  return Number((avg * 20).toFixed(1)); // scale to /100
+}, [latestResponse]);
+
+const dynamicTrendData = useMemo(() => {
+  if (!mySubmissions?.length) return [];
+
+  return mySubmissions.map((session, index) => {
+    const res = session.responses?.[0];
+    const row = { name: `S${index + 1}` };
+
+    res?.kpi_scores?.forEach((kpi) => {
+      row[kpi.kpi_name] = kpi.average_score;
+    });
+
+    return row;
+  });
+}, [mySubmissions]);
   return (
     <Layout role="user" title="Wellness Dashboard">
       <Stack spacing={2.5}>
@@ -1172,14 +1209,14 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={wellnessIndexData}
+                          data={dynamicWellnessData}
                           dataKey="value"
                           innerRadius={62}
                           outerRadius={90}
                           paddingAngle={2}
                           stroke="none"
                         >
-                          {wellnessIndexData.map((entry) => (
+                          {dynamicWellnessData.map((entry) => (
                             <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
@@ -1196,7 +1233,7 @@ export default function Dashboard() {
                     >
                       <Box>
                         <Typography variant="h3" sx={{ fontWeight: 800 }}>
-                          92.5
+                          {overallWellnessScore}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                           / 100
@@ -1271,31 +1308,20 @@ export default function Dashboard() {
                   </Stack>
 
                   <ResponsiveContainer width="100%" height={290}>
-                    <LineChart data={trendData}>
+                    <LineChart data={dynamicTrendData}>
                       <XAxis dataKey="name" />
                       <YAxis domain={[2, 5]} />
                       <Tooltip {...chartTooltipStyles} />
-                      <Line
-                        type="monotone"
-                        dataKey="social"
-                        stroke="#d946ef"
-                        strokeWidth={3}
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="hydration"
-                        stroke="#0284c7"
-                        strokeWidth={3}
-                        dot={false}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="energy"
-                        stroke="#ca8a04"
-                        strokeWidth={3}
-                        dot={false}
-                      />
+                    {dynamicWellnessData.map((kpi, index) => (
+  <Line
+    key={kpi.name}
+    type="monotone"
+    dataKey={kpi.name}
+    stroke={kpi.color}
+    strokeWidth={3}
+    dot={false}
+  />
+))}
                     </LineChart>
                   </ResponsiveContainer>
 

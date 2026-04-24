@@ -40,7 +40,8 @@ const pickArray = (payload) => {
 
 const normalizeCompany = (item, index = 0) => ({
   id: String(item?.id || item?.company_id || index),
-  company_name: item?.company_name || item?.name || item?.title || "Unnamed Company",
+  company_name:
+    item?.company_name || item?.name || item?.title || "Unnamed Company",
   industry: item?.industry || "",
   size_bucket: item?.size_bucket || "",
   email: item?.email || "",
@@ -55,6 +56,9 @@ const normalizeCompany = (item, index = 0) => ({
 const normalizeAdmin = (item) => ({
   id: String(item?.id || ""),
   emp_id: item?.emp_id || "",
+  username: item?.username || "",
+  password: item?.password || "",
+  age_band: item?.age_band || "",
   full_name: item?.full_name || "",
   department: item?.department || "",
   location: item?.location || "",
@@ -69,13 +73,20 @@ const normalizeAdmin = (item) => ({
 
 export const fetchCompanies = createAsyncThunk(
   "company/fetchCompanies",
-  async (_, { rejectWithValue }) => {
+  async ({ search = "", isActive } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get(API_URLS.companies);
+      const response = await api.get(API_URLS.companies, {
+        params: {
+          ...(search ? { search } : {}),
+          ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+        },
+      });
       const payload = response?.data || {};
 
       if (!payload?.success) {
-        return rejectWithValue(payload?.message || "Failed to fetch companies.");
+        return rejectWithValue(
+          payload?.message || "Failed to fetch companies.",
+        );
       }
 
       return {
@@ -151,17 +162,22 @@ export const createCompany = createAsyncThunk(
 
 export const updateCompany = createAsyncThunk(
   "company/updateCompany",
-  async ({ companyId, company }, { rejectWithValue }) => {
+  async ({ companyId, company, admin }, { rejectWithValue }) => {
     try {
-      const response = await api.put(API_URLS.companyById(companyId), company);
+      const response = await api.put(API_URLS.companyById(companyId), {
+        company,
+        ...(admin ? { admin } : {}),
+      });
       const payload = response?.data || {};
 
       if (!payload?.success || !payload?.data) {
         return rejectWithValue(payload?.message || "Failed to update company.");
       }
 
+      const updatedCompany = payload.data.company || payload.data;
       return {
-        company: normalizeCompany(payload.data),
+        company: normalizeCompany(updatedCompany),
+        admin: payload.data.admin ? normalizeAdmin(payload.data.admin) : null,
         message: payload?.message || "Company updated successfully.",
       };
     } catch (error) {
@@ -327,6 +343,8 @@ const companySlice = createSlice({
       })
       .addCase(fetchCompanyById.fulfilled, (state, action) => {
         state.detailLoading = false;
+        console.log("action.payload", action.payload.company);
+
         state.selectedCompany = action.payload.company;
         state.detailMessage = action.payload.message;
       })
@@ -357,6 +375,9 @@ const companySlice = createSlice({
         state.updateLoading = false;
         state.updateMessage = action.payload.message;
         state.selectedCompany = action.payload.company;
+        if (action.payload.admin) {
+          state.selectedCompany.admin = action.payload.admin;
+        }
         state.companies = state.companies.map((item) =>
           item.id === action.payload.company.id ? action.payload.company : item,
         );

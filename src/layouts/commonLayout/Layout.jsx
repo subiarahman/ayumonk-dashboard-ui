@@ -50,12 +50,15 @@ const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
 
 const adminItems = [
   { label: "Dashboard", to: "/admin/dashboard", icon: <DashboardIcon /> },
+  {
+    label: "Company Details",
+    to: "/admin/company-details",
+    icon: <BusinessIcon />,
+  },
   { label: "Company Users", to: "/admin/company-users", icon: <PeopleIcon /> },
-  { label: "Questions", to: "/admin/questions", icon: <QuizIcon /> },
-  { label: "Themes", to: "/admin/themes", icon: <CategoryIcon /> },
-  { label: "KPIs", to: "/admin/kpis", icon: <AssessmentIcon /> },
-  { label: "Challenges", to: "/admin/challenges", icon: <EmojiEventsIcon /> },
-  { label: "Sessions", to: "/admin/sessions", icon: <EventIcon /> },
+  // { label: "Themes", to: "/admin/themes", icon: <CategoryIcon /> },
+  // { label: "KPIs", to: "/admin/kpis", icon: <AssessmentIcon /> },
+  // { label: "Challenges", to: "/admin/challenges", icon: <EmojiEventsIcon /> },
 ];
 
 const userItems = [
@@ -78,6 +81,20 @@ const superAdminItems = [
     to: "/super-admin/company-data",
     icon: <BusinessIcon />,
   },
+  {
+    label: "Company Users",
+    to: "/super-admin/company-users",
+    icon: <PeopleIcon />,
+  },
+  { label: "Questions", to: "/super-admin/questions", icon: <QuizIcon /> },
+  { label: "Themes", to: "/super-admin/themes", icon: <CategoryIcon /> },
+  { label: "KPIs", to: "/super-admin/kpis", icon: <AssessmentIcon /> },
+  {
+    label: "Challenges",
+    to: "/super-admin/challenges",
+    icon: <EmojiEventsIcon />,
+  },
+  { label: "Sessions", to: "/super-admin/sessions", icon: <EventIcon /> },
   {
     label: "Suggestion Master",
     to: "/super-admin/suggestion-master",

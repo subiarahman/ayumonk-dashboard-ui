@@ -29,6 +29,7 @@ const initialState = {
 const normalizeChallenge = (item, index = 0) => ({
   id: String(item?.challenge_key || index),
   challenge_key: String(item?.challenge_key || index),
+  company_id: String(item?.company_id || ""),
   name: item?.name || "Untitled Challenge",
   challenge_type: item?.challenge_type || "",
   description: item?.description || "",
@@ -62,7 +63,7 @@ const normalizeChallengeDetail = (payload) => ({
 export const fetchChallenges = createAsyncThunk(
   "challenge/fetchChallenges",
   async (
-    { skip = 0, limit = 50, isActive = true, kpiKey, startDate, endDate } = {},
+    { skip = 0, limit = 50, isActive = true, kpiKey, startDate, endDate, companyId } = {},
     { rejectWithValue },
   ) => {
     try {
@@ -74,6 +75,7 @@ export const fetchChallenges = createAsyncThunk(
           ...(kpiKey ? { kpi_key: kpiKey } : {}),
           ...(startDate ? { start_date: startDate } : {}),
           ...(endDate ? { end_date: endDate } : {}),
+          ...(companyId ? { company_id: companyId } : {}),
         },
       });
 
@@ -116,6 +118,7 @@ export const createChallenge = createAsyncThunk(
       icon,
       isDaily,
       kpiMappings,
+      companyId,
     },
     { rejectWithValue },
   ) => {
@@ -129,6 +132,7 @@ export const createChallenge = createAsyncThunk(
         icon,
         is_daily: isDaily,
         kpi_mappings: kpiMappings,
+        ...(companyId ? { company_id: companyId } : {}),
       });
 
       const payload = response?.data || {};
@@ -205,6 +209,7 @@ export const updateChallenge = createAsyncThunk(
       isDaily,
       isActive,
       kpiMappings,
+      companyId,
     },
     { rejectWithValue },
   ) => {
@@ -219,6 +224,7 @@ export const updateChallenge = createAsyncThunk(
         is_daily: isDaily,
         is_active: isActive,
         kpi_mappings: kpiMappings,
+        ...(companyId ? { company_id: companyId } : {}),
       });
 
       const payload = response?.data || {};
@@ -273,7 +279,7 @@ export const deleteChallenge = createAsyncThunk(
 
 export const addChallengeKpiMapping = createAsyncThunk(
   "challenge/addChallengeKpiMapping",
-  async ({ challengeKey, kpiKey, startDate, endDate }, { rejectWithValue }) => {
+  async ({ challengeKey, kpiKey, startDate, endDate, companyId }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         API_URLS.challengeKpiMappings(challengeKey),
@@ -281,6 +287,7 @@ export const addChallengeKpiMapping = createAsyncThunk(
           kpi_key: kpiKey,
           start_date: startDate,
           end_date: endDate,
+          ...(companyId ? { company_id: companyId } : {}),
         },
       );
 

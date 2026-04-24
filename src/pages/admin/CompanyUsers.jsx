@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,9 +7,11 @@ import {
   Button,
   Chip,
   IconButton,
+  MenuItem,
   Paper,
   Stack,
   Tooltip,
+  TextField,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -37,8 +39,9 @@ import {
 import { getSurfaceBackground } from "../../theme";
 import { downloadTemplateFile } from "../../utils/downloadTemplate";
 import { formatDateTimeIST } from "../../utils/dateTime";
+import { getCompanyId } from "../../utils/roleHelper";
 
-export default function CompanyUsers() {
+export default function CompanyUsers({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -46,6 +49,16 @@ export default function CompanyUsers() {
   const fileInputRef = useRef(null);
   const feedback = location.state?.feedback;
   const [uploadFeedback, setUploadFeedback] = useState(null);
+  const [filters, setFilters] = useState({
+    companyId: role === "admin" ? getCompanyId() : "",
+    search: "",
+    status: "all",
+  });
+  const [appliedFilters, setAppliedFilters] = useState({
+    companyId: role === "admin" ? getCompanyId() : "",
+    search: "",
+    status: "all",
+  });
   const {
     users,
     total,
@@ -62,10 +75,31 @@ export default function CompanyUsers() {
     status: uploadStatus,
   } = useSelector((state) => state.userUpload);
 
+  const companyId = role === "admin" ? getCompanyId() : "";
+
   useEffect(() => {
-    dispatch(fetchUsers());
     dispatch(fetchCompanies());
   }, [dispatch]);
+
+  const getUserListParams = useCallback(() => {
+    const resolvedCompanyId =
+      role === "admin"
+        ? companyId
+        : appliedFilters.companyId.trim();
+
+    return {
+      ...(resolvedCompanyId ? { companyId: resolvedCompanyId } : {}),
+      search: appliedFilters.search.trim(),
+      isActive:
+        appliedFilters.status === "all"
+          ? undefined
+          : appliedFilters.status === "active",
+    };
+  }, [appliedFilters.companyId, appliedFilters.search, appliedFilters.status, companyId, role]);
+
+  useEffect(() => {
+    dispatch(fetchUsers(getUserListParams()));
+  }, [dispatch, getUserListParams]);
 
   useEffect(() => {
     return () => {
@@ -84,17 +118,23 @@ export default function CompanyUsers() {
     [companies],
   );
 
-  const handleDelete = async (userId, fullName) => {
-    if (!window.confirm(`Delete user "${fullName}"?`)) return;
+  const handleDelete = useCallback(
+    async (userId, fullName) => {
+      if (role === "admin") return;
+      if (!window.confirm(`Delete user "${fullName}"?`)) return;
 
-    try {
-      await dispatch(deleteUser(userId)).unwrap();
-    } catch {
-      // Redux state already stores the error.
-    }
-  };
+      try {
+        await dispatch(deleteUser(userId)).unwrap();
+      } catch {
+        // Redux state already stores the error.
+      }
+    },
+    [dispatch, role],
+  );
 
   const handleImport = async (event) => {
+    if (role === "admin") return;
+
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -103,7 +143,7 @@ export default function CompanyUsers() {
 
     try {
       await dispatch(uploadUserFile(file)).unwrap();
-      await dispatch(fetchUsers()).unwrap();
+      await dispatch(fetchUsers(getUserListParams())).unwrap();
       setUploadFeedback({
         severity: "success",
         message: `User file "${file.name}" uploaded successfully.`,
@@ -119,8 +159,27 @@ export default function CompanyUsers() {
     downloadTemplateFile("templates/CompanyUserData.xlsx", "CompanyUserData.xlsx");
   };
 
-  const columns = useMemo(
-    () => [
+  const handleApplyFilters = () => {
+    setAppliedFilters({
+      companyId: filters.companyId,
+      search: filters.search.trim(),
+      status: filters.status,
+    });
+  };
+
+  const handleResetFilters = () => {
+    const defaultFilters = {
+      companyId: role === "admin" ? getCompanyId() : "",
+      search: "",
+      status: "all",
+    };
+
+    setFilters(defaultFilters);
+    setAppliedFilters(defaultFilters);
+  };
+
+  const columns = useMemo(() => {
+    const baseColumns = [
       {
         field: "emp_id",
         headerName: "Employee ID",
@@ -190,6 +249,43 @@ export default function CompanyUsers() {
         minWidth: 190,
         valueFormatter: (value) => formatDateTimeIST(value),
       },
+    ];
+
+    if (role === "admin") {
+      return [
+        ...baseColumns,
+        {
+          field: "actions",
+          headerName: "Actions",
+          sortable: false,
+          filterable: false,
+          minWidth: 120,
+          renderCell: ({ row }) => (
+            <Stack direction="row" spacing={0.5}>
+              <Tooltip title="View">
+                <IconButton
+                  size="small"
+                  onClick={() => navigate(`/admin/company-users/${row.id}`)}
+                >
+                  <PreviewRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Edit">
+                <IconButton
+                  size="small"
+                  onClick={() => navigate(`/admin/company-users/${row.id}/edit`)}
+                >
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ),
+        },
+      ];
+    }
+
+    return [
+      ...baseColumns,
       {
         field: "actions",
         headerName: "Actions",
@@ -201,7 +297,7 @@ export default function CompanyUsers() {
             <Tooltip title="View">
               <IconButton
                 size="small"
-                onClick={() => navigate(`/admin/company-users/${row.id}`)}
+                onClick={() => navigate(`/super-admin/company-users/${row.id}`)}
               >
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
@@ -209,7 +305,7 @@ export default function CompanyUsers() {
             <Tooltip title="Edit">
               <IconButton
                 size="small"
-                onClick={() => navigate(`/admin/company-users/${row.id}/edit`)}
+                onClick={() => navigate(`/super-admin/company-users/${row.id}/edit`)}
               >
                 <EditRoundedIcon fontSize="small" />
               </IconButton>
@@ -229,12 +325,11 @@ export default function CompanyUsers() {
           </Stack>
         ),
       },
-    ],
-    [companyNameById, deleteLoading, navigate],
-  );
+    ];
+  }, [companyNameById, deleteLoading, handleDelete, navigate, role]);
 
   return (
-    <Layout role="admin" title="Company User Data">
+    <Layout role={role} title="Company User Data">
       <Stack spacing={2}>
         {feedback && <Alert severity={feedback.severity}>{feedback.message}</Alert>}
         {error && <Alert severity="error">{error}</Alert>}
@@ -268,65 +363,151 @@ export default function CompanyUsers() {
                 Company Users
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 0.75, maxWidth: 720 }}>
-                Manage employee records with API-backed create, update, view, delete,
-                and file upload.
+                {role === "admin"
+                  ? "Review and update company user records for your company."
+                  : "Manage employee records with API-backed create, update, view, delete, and file upload."}
               </Typography>
             </Box>
 
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Button
-                variant="contained"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => navigate("/admin/company-users/add")}
-                sx={{ height: 40, px: 2.5, whiteSpace: "nowrap" }}
-              >
-                Add User
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<FileDownloadRoundedIcon />}
-                onClick={handleDownloadFormat}
-                sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-              >
-                Download format
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileRoundedIcon />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadLoading}
-                sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-              >
-                {uploadLoading ? "Uploading..." : "Import Excel"}
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshRoundedIcon />}
-                onClick={() => dispatch(fetchUsers())}
-                disabled={usersLoading}
-                sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-              >
-                Refresh
-              </Button>
-            </Stack>
+            {role === "superadmin" && (
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                <Button
+                  variant="contained"
+                  startIcon={<AddRoundedIcon />}
+                  onClick={() => navigate("/super-admin/company-users/add")}
+                  sx={{ height: 40, px: 2.5, whiteSpace: "nowrap" }}
+                >
+                  Add User
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<FileDownloadRoundedIcon />}
+                  onClick={handleDownloadFormat}
+                  sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+                >
+                  Download format
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileRoundedIcon />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadLoading}
+                  sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+                >
+                  {uploadLoading ? "Uploading..." : "Import Excel"}
+                </Button>
+              </Stack>
+            )}
+
+            <Button
+              variant="outlined"
+              startIcon={<RefreshRoundedIcon />}
+              onClick={() => dispatch(fetchUsers(getUserListParams()))}
+              disabled={usersLoading}
+              sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+            >
+              Refresh
+            </Button>
           </Stack>
 
-          <input
-            hidden
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={handleImport}
-            onClick={() => {
-              if (uploadError) {
-                dispatch(clearUserUploadError());
-              }
-            }}
-          />
+          {role === "superadmin" && (
+            <input
+              hidden
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleImport}
+              onClick={() => {
+                if (uploadError) {
+                  dispatch(clearUserUploadError());
+                }
+              }}
+            />
+          )}
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Total users: {total || users.length}
           </Typography>
+
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1.5,
+              mb: 2,
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+                lg: role === "superadmin"
+                  ? "repeat(4, minmax(0, 1fr)) auto auto"
+                  : "repeat(3, minmax(0, 1fr)) auto auto",
+              },
+              alignItems: { lg: "end" },
+            }}
+          >
+            {role === "superadmin" && (
+              <TextField
+                label="Company"
+                select
+                value={filters.companyId}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    companyId: event.target.value,
+                  }))
+                }
+                fullWidth
+              >
+                <MenuItem value="">All Companies</MenuItem>
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.company_name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
+            <TextField
+              label="Search"
+              value={filters.search}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  search: event.target.value,
+                }))
+              }
+              fullWidth
+            />
+            <TextField
+              label="Status"
+              select
+              value={filters.status}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  status: event.target.value,
+                }))
+              }
+              fullWidth
+            >
+              <MenuItem value="all">All Status</MenuItem>
+              <MenuItem value="active">Active</MenuItem>
+              <MenuItem value="inactive">Inactive</MenuItem>
+            </TextField>
+            <Button
+              variant="contained"
+              onClick={handleApplyFilters}
+              disabled={usersLoading}
+              sx={{ minHeight: 56, px: 3, whiteSpace: "nowrap" }}
+            >
+              Apply Filters
+            </Button>
+            <Button
+              variant="text"
+              onClick={handleResetFilters}
+              sx={{ minHeight: 56, px: 2, whiteSpace: "nowrap" }}
+            >
+              Reset
+            </Button>
+          </Box>
 
           <Box sx={{ width: "100%", overflowX: "auto" }}>
             <Box sx={{ height: 560, width: "max-content", minWidth: "100%" }}>

@@ -6,14 +6,17 @@ import {
   Box,
   Button,
   Chip,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   Typography,
   useTheme,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import Layout from "../../layouts/commonLayout/Layout";
+import { fetchCompanies } from "../../store/companySlice";
 import { fetchThemes } from "../../store/themeSlice";
 import { clearKpiDetailState, fetchKpiById } from "../../store/kpiSlice";
 import { getSurfaceBackground } from "../../theme";
@@ -23,15 +26,23 @@ export default function KpiView() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
+  const { companies } = useSelector((state) => state.company);
   const { items: themeItems } = useSelector((state) => state.theme);
-  const { selectedKpi, detailLoading, detailError } = useSelector((state) => state.kpi);
+  const { selectedKpi, detailLoading, detailError } = useSelector(
+    (state) => state.kpi,
+  );
 
   useEffect(() => {
-    dispatch(fetchThemes());
+    dispatch(fetchCompanies());
     if (id) {
       dispatch(fetchKpiById(id));
     }
   }, [dispatch, id]);
+
+  useEffect(() => {
+    if (!selectedKpi?.company_id) return;
+    dispatch(fetchThemes({ companyId: selectedKpi.company_id }));
+  }, [dispatch, selectedKpi?.company_id]);
 
   useEffect(() => {
     return () => {
@@ -42,8 +53,19 @@ export default function KpiView() {
   const themeName = useMemo(
     () =>
       themeItems.find((item) => item.theme_key === selectedKpi?.theme_key)
-        ?.theme_display_name || selectedKpi?.theme_key || "-",
+        ?.theme_display_name ||
+      selectedKpi?.theme_key ||
+      "-",
     [selectedKpi?.theme_key, themeItems],
+  );
+
+  const companyName = useMemo(
+    () =>
+      companies.find((item) => item.id === selectedKpi?.company_id)
+        ?.company_name ||
+      selectedKpi?.company_id ||
+      "-",
+    [companies, selectedKpi?.company_id],
   );
 
   return (
@@ -73,7 +95,10 @@ export default function KpiView() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
-            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate("/admin/kpis")}>
+            <Button
+              startIcon={<ArrowBackRoundedIcon />}
+              onClick={() => navigate("/admin/kpis")}
+            >
               Back to list
             </Button>
             <Button
@@ -93,36 +118,57 @@ export default function KpiView() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, minmax(0, 1fr))",
+              },
               gap: 2,
             }}
           >
-            {/* <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">KPI Key</Typography>
-              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{selectedKpi.kpi_key}</Typography>
-            </Paper> */}
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">KPI Name</Typography>
-              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{selectedKpi.display_name}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Company
+              </Typography>
+              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                {companyName}
+              </Typography>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">Theme</Typography>
-              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{themeName}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                KPI Name
+              </Typography>
+              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                {selectedKpi.display_name}
+              </Typography>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">Domain Category</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Theme
+              </Typography>
+              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                {themeName}
+              </Typography>
+            </Paper>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
+              <Typography variant="caption" color="text.secondary">
+                Domain Category
+              </Typography>
               <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
                 {selectedKpi.domain_category || "-"}
               </Typography>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">WI Weight</Typography>
+              <Typography variant="caption" color="text.secondary">
+                WI Weight
+              </Typography>
               <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
                 {selectedKpi.wi_weight ?? "-"}
               </Typography>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">Status</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Status
+              </Typography>
               <Box sx={{ mt: 1 }}>
                 <Chip
                   size="small"
@@ -133,12 +179,20 @@ export default function KpiView() {
               </Box>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">Start Date</Typography>
-              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{selectedKpi.start_date || "-"}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                Start Date
+              </Typography>
+              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                {selectedKpi.start_date || "-"}
+              </Typography>
             </Paper>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5 }}>
-              <Typography variant="caption" color="text.secondary">End Date</Typography>
-              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{selectedKpi.end_date || "-"}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                End Date
+              </Typography>
+              <Typography sx={{ mt: 0.8, fontWeight: 600 }}>
+                {selectedKpi.end_date || "-"}
+              </Typography>
             </Paper>
           </Box>
         )}

@@ -21,7 +21,7 @@ import {
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
-export default function ThemeView() {
+export default function ThemeView({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -42,8 +42,10 @@ export default function ThemeView() {
     };
   }, [dispatch]);
 
+  const backPath = role === "admin" ? "/admin/themes" : "/super-admin/themes";
+
   return (
-    <Layout role="admin" title="View Theme">
+    <Layout role={role} title="View Theme">
       <Paper
         elevation={0}
         sx={{
@@ -69,19 +71,18 @@ export default function ThemeView() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
-            <Button
-              startIcon={<ArrowBackRoundedIcon />}
-              onClick={() => navigate("/admin/themes")}
-            >
+            <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(backPath)}>
               Back to list
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/admin/themes/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {role === "superadmin" && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() => navigate(`/super-admin/themes/${id}/edit`)}
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 

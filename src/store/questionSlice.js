@@ -35,6 +35,7 @@ const normalizeOption = (item, index = 0) => ({
 
 const normalizeQuestion = (item, index = 0) => ({
   id: String(item?.id || index),
+  company_id: String(item?.company_id || ""),
   theme_key: String(item?.theme_key || ""),
   kpi_key: String(item?.kpi_key || ""),
   question_code: item?.question_code || "",
@@ -49,7 +50,15 @@ const normalizeQuestion = (item, index = 0) => ({
 export const fetchQuestions = createAsyncThunk(
   "question/fetchQuestions",
   async (
-    { skip = 0, limit = 50, kpiKey = "", themeKey = "", search = "", isActive } = {},
+    {
+      skip = 0,
+      limit = 50,
+      kpiKey = "",
+      themeKey = "",
+      search = "",
+      isActive,
+      companyId,
+    } = {},
     { rejectWithValue },
   ) => {
     try {
@@ -61,6 +70,7 @@ export const fetchQuestions = createAsyncThunk(
           ...(themeKey ? { theme_key: themeKey } : {}),
           ...(search ? { search } : {}),
           ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+          ...(companyId ? { company_id: companyId } : {}),
         },
       });
 
@@ -114,9 +124,12 @@ export const fetchQuestionById = createAsyncThunk(
 
 export const createQuestion = createAsyncThunk(
   "question/createQuestion",
-  async (question, { rejectWithValue }) => {
+  async ({ companyId, ...question }, { rejectWithValue }) => {
     try {
-      const response = await api.post(API_URLS.questions, question);
+      const response = await api.post(API_URLS.questions, {
+        ...question,
+        ...(companyId ? { company_id: companyId } : {}),
+      });
       const payload = response?.data || {};
 
       if (!payload?.success || !payload?.data) {
@@ -140,9 +153,12 @@ export const createQuestion = createAsyncThunk(
 
 export const updateQuestion = createAsyncThunk(
   "question/updateQuestion",
-  async ({ questionId, question }, { rejectWithValue }) => {
+  async ({ questionId, question, companyId }, { rejectWithValue }) => {
     try {
-      const response = await api.put(API_URLS.questionById(questionId), question);
+      const response = await api.put(API_URLS.questionById(questionId), {
+        ...question,
+        ...(companyId ? { company_id: companyId } : {}),
+      });
       const payload = response?.data || {};
 
       if (!payload?.success || !payload?.data) {

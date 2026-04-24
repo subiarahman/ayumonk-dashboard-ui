@@ -44,7 +44,7 @@ const filterFieldSx = {
   },
 };
 
-export default function Questions() {
+export default function Questions({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -285,7 +285,13 @@ export default function Questions() {
             <Tooltip title="View">
               <IconButton
                 size="small"
-                onClick={() => navigate(`/admin/questions/${row.id}`)}
+                onClick={() =>
+                  navigate(
+                    role === "admin"
+                      ? `/admin/questions/${row.id}`
+                      : `/super-admin/questions/${row.id}`,
+                  )
+                }
               >
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
@@ -293,7 +299,7 @@ export default function Questions() {
             <Tooltip title="Edit">
               <IconButton
                 size="small"
-                onClick={() => navigate(`/admin/questions/${row.id}/edit`)}
+                onClick={() => navigate(`/super-admin/questions/${row.id}/edit`)}
               >
                 <EditRoundedIcon fontSize="small" />
               </IconButton>
@@ -314,11 +320,11 @@ export default function Questions() {
         ),
       },
     ],
-    [deleteLoading, handleDelete, kpiNameByKey, navigate, themeNameByKey],
+    [deleteLoading, handleDelete, kpiNameByKey, navigate, role, themeNameByKey],
   );
 
   return (
-    <Layout role="admin" title="Question Bank">
+    <Layout role={role} title="Question Bank">
       <Stack spacing={2}>
         {feedback && (
           <Alert severity={feedback.severity}>{feedback.message}</Alert>
@@ -363,13 +369,15 @@ export default function Questions() {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Button
-                variant="contained"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => navigate("/admin/questions/add")}
-              >
-                Add Question
-              </Button>
+              {role === "superadmin" && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddRoundedIcon />}
+                  onClick={() => navigate("/super-admin/questions/add")}
+                >
+                  Add Question
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<FileDownloadRoundedIcon />}
@@ -378,15 +386,17 @@ export default function Questions() {
               >
                 Download format
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileRoundedIcon />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadLoading}
-                sx={{ whiteSpace: "nowrap" }}
-              >
-                {uploadLoading ? "Uploading..." : "Import Excel"}
-              </Button>
+              {role === "superadmin" && (
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileRoundedIcon />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadLoading}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  {uploadLoading ? "Uploading..." : "Import Excel"}
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<RefreshRoundedIcon />}
@@ -513,21 +523,25 @@ export default function Questions() {
               <MenuItem value="active">Active</MenuItem>
               <MenuItem value="inactive">Inactive</MenuItem>
             </TextField>
-            <Button
-              variant="outlined"
-              onClick={handleApplyFilters}
-              disabled={listLoading}
-              sx={{ minHeight: 56, px: 3, whiteSpace: "nowrap" }}
-            >
-              Apply Filters
-            </Button>
-            <Button
-              variant="text"
-              onClick={handleResetFilters}
-              sx={{ minHeight: 56, px: 2, whiteSpace: "nowrap" }}
-            >
-              Reset
-            </Button>
+              {role === "superadmin" && (
+                <>
+                  <Button
+                    variant="outlined"
+                    onClick={handleApplyFilters}
+                    disabled={listLoading}
+                    sx={{ minHeight: 56, px: 3, whiteSpace: "nowrap" }}
+                  >
+                    Apply Filters
+                  </Button>
+                  <Button
+                    variant="text"
+                    onClick={handleResetFilters}
+                    sx={{ minHeight: 56, px: 2, whiteSpace: "nowrap" }}
+                  >
+                    Reset
+                  </Button>
+                </>
+              )}
           </Box>
 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>

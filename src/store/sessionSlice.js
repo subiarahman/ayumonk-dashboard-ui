@@ -397,9 +397,13 @@ export const deleteSession = createAsyncThunk(
 
 export const fetchSessions = createAsyncThunk(
   "session/fetchSessions",
-  async (_, { rejectWithValue }) => {
+  async ({ companyId } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get(API_URLS.sessions);
+      const response = await api.get(API_URLS.sessions, {
+        params: {
+          ...(companyId ? { company_id: companyId } : {}),
+        },
+      });
       const payload = response?.data || {};
 
       if (!payload?.success) {

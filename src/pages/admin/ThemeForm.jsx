@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   FormControlLabel,
+  MenuItem,
   Paper,
   Stack,
   Switch,
@@ -24,30 +25,28 @@ import {
   fetchThemeById,
   updateTheme,
 } from "../../store/themeSlice";
+import { fetchCompanies } from "../../store/companySlice";
+import { getCompanyId } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
 
-export default function ThemeForm({ mode }) {
+export default function ThemeForm({ mode, role = "superadmin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { id } = useParams();
-  const {
-    selectedTheme,
-    createLoading,
-    createError,
-    detailLoading,
-    detailError,
-    updateLoading,
-    updateError,
-  } = useSelector((state) => state.theme);
+  const { selectedTheme, createLoading, createError, detailLoading, detailError, updateLoading, updateError } =
+    useSelector((state) => state.theme);
+  const { companies } = useSelector((state) => state.company);
   const [themeDisplayName, setThemeDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [durationDays, setDurationDays] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
+    dispatch(fetchCompanies());
     if (mode === "edit" && id) {
       dispatch(fetchThemeById(id));
     }
@@ -64,8 +63,15 @@ export default function ThemeForm({ mode }) {
       );
       setTargetAudience(selectedTheme.target_audience || "");
       setIsActive(Boolean(selectedTheme.is_active));
+      setCompanyId(selectedTheme.company_id || "");
     }
   }, [mode, selectedTheme]);
+
+  useEffect(() => {
+    if (role === "admin") {
+      setCompanyId(getCompanyId());
+    }
+  }, [role]);
 
   useEffect(() => {
     return () => {
@@ -85,49 +91,41 @@ export default function ThemeForm({ mode }) {
       setFormError("Theme name is required.");
       return;
     }
+    if (role === "superadmin" && !companyId) {
+      setFormError("Company is required.");
+      return;
+    }
 
     setFormError("");
 
     try {
+      const payload = {
+        themeDisplayName: themeDisplayName.trim(),
+        description: description.trim(),
+        durationDays: durationDays === "" ? null : Number(durationDays),
+        targetAudience: targetAudience.trim(),
+        companyId: role === "superadmin" ? companyId : getCompanyId(),
+      };
+
       if (mode === "edit") {
         await dispatch(
           updateTheme({
             themeKey: id,
-            themeDisplayName: themeDisplayName.trim(),
-            description: description.trim(),
-            durationDays: durationDays === "" ? null : Number(durationDays),
-            targetAudience: targetAudience.trim(),
+            ...payload,
             isActive,
           }),
         ).unwrap();
-        navigate("/admin/themes", {
+        navigate(role === "admin" ? "/admin/themes" : "/super-admin/themes", {
           replace: true,
-          state: {
-            feedback: {
-              severity: "success",
-              message: "Theme updated successfully.",
-            },
-          },
+          state: { feedback: { severity: "success", message: "Theme updated successfully." } },
         });
         return;
       }
 
-      await dispatch(
-        createTheme({
-          themeDisplayName: themeDisplayName.trim(),
-          description: description.trim(),
-          durationDays: durationDays === "" ? null : Number(durationDays),
-          targetAudience: targetAudience.trim(),
-        }),
-      ).unwrap();
-      navigate("/admin/themes", {
+      await dispatch(createTheme(payload)).unwrap();
+      navigate("/super-admin/themes", {
         replace: true,
-        state: {
-          feedback: {
-            severity: "success",
-            message: "Theme added successfully.",
-          },
-        },
+        state: { feedback: { severity: "success", message: "Theme added successfully." } },
       });
     } catch {
       // Error is already handled in redux state.
@@ -136,17 +134,8 @@ export default function ThemeForm({ mode }) {
 
   if (mode === "edit" && detailLoading) {
     return (
-      <Layout role="admin" title={pageTitle}>
-        <Paper
-          elevation={0}
-          sx={{
-            p: { xs: 2, sm: 3 },
-            borderRadius: 3,
-            border: "1px solid",
-            borderColor: "divider",
-            bgcolor: getSurfaceBackground(theme),
-          }}
-        >
+      <Layout role={role} title={pageTitle}>
+        <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, border: "1px solid", borderColor: "divider", bgcolor: getSurfaceBackground(theme) }}>
           <Typography>Loading theme...</Typography>
         </Paper>
       </Layout>
@@ -154,105 +143,53 @@ export default function ThemeForm({ mode }) {
   }
 
   return (
-    <Layout role="admin" title={pageTitle}>
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, sm: 3 },
-          borderRadius: 3,
-          border: "1px solid",
-          borderColor: "divider",
-          bgcolor: getSurfaceBackground(theme),
-        }}
-      >
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          justifyContent="space-between"
-          spacing={2}
-          sx={{ mb: 3 }}
-        >
+    <Layout role={role} title={pageTitle}>
+      <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, border: "1px solid", borderColor: "divider", bgcolor: getSurfaceBackground(theme) }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 750 }}>
-              {pageTitle}
-            </Typography>
+            <Typography variant="h5" sx={{ fontWeight: 750 }}>{pageTitle}</Typography>
             <Typography color="text.secondary" sx={{ mt: 0.75 }}>
-              {mode === "edit"
-                ? "Update the theme details below."
-                : "Create a new theme using the API-backed form."}
+              {mode === "edit" ? "Update the theme details below." : "Create a new theme using the API-backed form."}
             </Typography>
           </Box>
-          <Button
-            startIcon={<ArrowBackRoundedIcon />}
-            onClick={() => navigate("/admin/themes")}
-          >
+          <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(role === "admin" ? "/admin/themes" : "/super-admin/themes")}>
             Back to list
           </Button>
         </Stack>
 
         {(formError || createError || updateError || detailError) && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {formError || createError || updateError || detailError}
-          </Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>{formError || createError || updateError || detailError}</Alert>
         )}
 
         <Stack spacing={2}>
-          <TextField
-            label="Theme Name"
-            value={themeDisplayName}
-            onChange={(event) => {
-              setFormError("");
-              setThemeDisplayName(event.target.value);
-            }}
-            fullWidth
-          />
-          <TextField
-            label="Description"
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            multiline
-            minRows={3}
-            fullWidth
-          />
-          <TextField
-            label="Duration Days"
-            type="number"
-            inputProps={{ min: 0 }}
-            value={durationDays}
-            onChange={(event) => setDurationDays(event.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Target Audience"
-            value={targetAudience}
-            onChange={(event) => setTargetAudience(event.target.value)}
-            fullWidth
-          />
-
+          {role === "superadmin" && (
+            <TextField
+              label="Company"
+              value={companyId}
+              onChange={(event) => setCompanyId(event.target.value)}
+              select
+              fullWidth
+            >
+              <MenuItem value="">Select Company</MenuItem>
+              {companies.map((company) => (
+                <MenuItem key={company.id} value={company.id}>{company.company_name}</MenuItem>
+              ))}
+            </TextField>
+          )}
+          <TextField label="Theme Name" value={themeDisplayName} onChange={(event) => { setFormError(""); setThemeDisplayName(event.target.value); }} fullWidth />
+          <TextField label="Description" value={description} onChange={(event) => setDescription(event.target.value)} multiline minRows={3} fullWidth />
+          <TextField label="Duration Days" type="number" inputProps={{ min: 0 }} value={durationDays} onChange={(event) => setDurationDays(event.target.value)} fullWidth />
+          <TextField label="Target Audience" value={targetAudience} onChange={(event) => setTargetAudience(event.target.value)} fullWidth />
           {mode === "edit" && (
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isActive}
-                  onChange={(event) => setIsActive(event.target.checked)}
-                />
-              }
-              label="Active"
-            />
+            <FormControlLabel control={<Switch checked={isActive} onChange={(event) => setIsActive(event.target.checked)} />} label="Active" />
           )}
         </Stack>
 
         <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-          <Button
-            variant="contained"
-            startIcon={<SaveRoundedIcon />}
-            onClick={handleSave}
-            disabled={createLoading || updateLoading}
-          >
+          <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} disabled={createLoading || updateLoading}>
             {createLoading || updateLoading ? "Saving..." : "Save"}
           </Button>
-          <Button variant="outlined" onClick={() => navigate("/admin/themes")}>
-            Cancel
-          </Button>
+          <Button variant="outlined" onClick={() => navigate(role === "admin" ? "/admin/themes" : "/super-admin/themes")}>Cancel</Button>
         </Stack>
       </Paper>
     </Layout>

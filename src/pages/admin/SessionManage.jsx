@@ -353,7 +353,7 @@ export default function SessionManage() {
                     Update question assignment and order for this session.
                   </Typography>
                 </Box>
-                <Button variant="outlined" onClick={() => navigate("/admin/sessions")}>
+                <Button variant="outlined" onClick={() => navigate("/super-admin/sessions")}>
                   Back To Sessions
                 </Button>
               </Stack>

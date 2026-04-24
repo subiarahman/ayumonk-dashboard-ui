@@ -23,8 +23,10 @@ import {
   fetchUserById,
   updateUser,
 } from "../../store/userSlice";
+import { fetchCompanies } from "../../store/companySlice";
 import api, { getApiErrorMessage } from "../../services/api";
 import { API_URLS } from "../../services/apiUrls";
+import { getCompanyId, setCompanyId } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
 
 const emptyForm = {
@@ -36,9 +38,10 @@ const emptyForm = {
   age_band: "",
   phone: "",
   email: "",
+  company_id: "",
 };
 
-export default function CompanyUsersForm({ mode }) {
+export default function CompanyUsersForm({ mode, role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -52,41 +55,41 @@ export default function CompanyUsersForm({ mode }) {
     updateLoading,
     updateError,
   } = useSelector((state) => state.user);
+  const { companies } = useSelector((state) => state.company);
   const [form, setForm] = useState(mode === "edit" ? {} : emptyForm);
   const [formError, setFormError] = useState("");
   const [companyMe, setCompanyMe] = useState(null);
-  const [companyError, setCompanyError] = useState("");
+  const [companyMeError, setCompanyMeError] = useState("");
 
   const pageTitle = useMemo(
     () => (mode === "edit" ? "Edit User" : "Add User"),
     [mode],
   );
+  const companyId = getCompanyId();
 
   useEffect(() => {
-    let isMounted = true;
+    dispatch(fetchCompanies());
 
-    const fetchCompanyMe = async () => {
-      try {
-        const response = await api.get(API_URLS.companyMe);
-        const payload = response?.data || {};
-        if (!payload?.success || !payload?.data) {
-          throw new Error(payload?.message || "Failed to fetch company details.");
-        }
-        if (isMounted) {
+    if (role === "admin") {
+      const fetchCompanyMe = async () => {
+        try {
+          const response = await api.get(API_URLS.companyMe);
+          const payload = response?.data || {};
+          if (!payload?.success || !payload?.data) {
+            throw new Error(payload?.message || "Failed to fetch company details.");
+          }
+
           setCompanyMe(payload.data);
-          setCompanyError("");
-        }
-      } catch (error) {
-        if (isMounted) {
+          setCompanyMeError("");
+          setCompanyId(payload.data?.id || payload.data?.company_id || "");
+        } catch (error) {
           setCompanyMe(null);
-          setCompanyError(
-            getApiErrorMessage(error, "Failed to fetch company details."),
-          );
+          setCompanyMeError(getApiErrorMessage(error, "Failed to fetch company details."));
         }
-      }
-    };
+      };
 
-    fetchCompanyMe();
+      fetchCompanyMe();
+    }
 
     if (mode === "edit" && id) {
       dispatch(fetchUserById(id));
@@ -97,25 +100,37 @@ export default function CompanyUsersForm({ mode }) {
       dispatch(clearUserUpdateState());
       dispatch(clearUserDetailState());
     };
-  }, [dispatch, id, mode]);
+  }, [dispatch, id, mode, role]);
+
+  const selectedCompanyId = useMemo(() => {
+    if (role === "admin") {
+      return companyMe?.id || companyMe?.company_id || companyId || "";
+    }
+    return form.company_id || selectedUser?.company_id || "";
+  }, [companyId, companyMe, form.company_id, role, selectedUser?.company_id]);
 
   const resolvedForm = useMemo(() => {
-    if (mode !== "edit") {
-      return form;
-    }
+    const base =
+      mode === "edit"
+        ? {
+            emp_id: selectedUser?.emp_id || "",
+            full_name: selectedUser?.full_name || "",
+            department: selectedUser?.department || "",
+            location: selectedUser?.location || "",
+            gender: selectedUser?.gender || "",
+            age_band: selectedUser?.age_band || "",
+            phone: selectedUser?.phone || "",
+            email: selectedUser?.email || "",
+            company_id: selectedUser?.company_id || "",
+          }
+        : emptyForm;
 
     return {
-      emp_id: selectedUser?.emp_id || "",
-      full_name: selectedUser?.full_name || "",
-      department: selectedUser?.department || "",
-      location: selectedUser?.location || "",
-      gender: selectedUser?.gender || "",
-      age_band: selectedUser?.age_band || "",
-      phone: selectedUser?.phone || "",
-      email: selectedUser?.email || "",
+      ...base,
       ...form,
+      company_id: role === "admin" ? selectedCompanyId : form.company_id || base.company_id,
     };
-  }, [form, mode, selectedUser]);
+  }, [form, mode, role, selectedCompanyId, selectedUser]);
 
   const validate = () => {
     if (
@@ -129,8 +144,9 @@ export default function CompanyUsersForm({ mode }) {
     ) {
       return "Complete all required user fields.";
     }
-    if (!companyMe?.id) {
-      return "Company details are unavailable. Please refresh and try again.";
+
+    if (!resolvedForm.company_id) {
+      return "Select a company for this user.";
     }
 
     return "";
@@ -154,7 +170,7 @@ export default function CompanyUsersForm({ mode }) {
       age_band: resolvedForm.age_band,
       phone: resolvedForm.phone.trim(),
       email: resolvedForm.email.trim(),
-      company_id: companyMe?.id,
+      company_id: resolvedForm.company_id,
     };
 
     try {
@@ -164,7 +180,7 @@ export default function CompanyUsersForm({ mode }) {
         await dispatch(createUser(payload)).unwrap();
       }
 
-      navigate("/admin/company-users", {
+      navigate(role === "admin" ? "/admin/company-users" : "/super-admin/company-users", {
         replace: true,
         state: {
           feedback: {
@@ -180,7 +196,7 @@ export default function CompanyUsersForm({ mode }) {
 
   if (mode === "edit" && detailLoading) {
     return (
-      <Layout role="admin" title={pageTitle}>
+      <Layout role={role} title={pageTitle}>
         <Paper
           elevation={0}
           sx={{
@@ -198,7 +214,7 @@ export default function CompanyUsersForm({ mode }) {
   }
 
   return (
-    <Layout role="admin" title={pageTitle}>
+    <Layout role={role} title={pageTitle}>
       <Paper
         elevation={0}
         sx={{
@@ -227,15 +243,17 @@ export default function CompanyUsersForm({ mode }) {
           </Box>
           <Button
             startIcon={<ArrowBackRoundedIcon />}
-            onClick={() => navigate("/admin/company-users")}
+            onClick={() =>
+              navigate(role === "admin" ? "/admin/company-users" : "/super-admin/company-users")
+            }
           >
             Back to list
           </Button>
         </Stack>
 
-        {(formError || companyError || detailError || createError || updateError) && (
+        {(formError || companyMeError || detailError || createError || updateError) && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {formError || companyError || detailError || createError || updateError}
+            {formError || companyMeError || detailError || createError || updateError}
           </Alert>
         )}
 
@@ -307,13 +325,11 @@ export default function CompanyUsersForm({ mode }) {
             fullWidth
           >
             <MenuItem value="">Select Age Band</MenuItem>
-            {["20-25", "26-30", "31-35", "36-40", "41-50", "50+"].map(
-              (option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ),
-            )}
+            {["20-25", "26-30", "31-35", "36-40", "41-50", "50+"].map((option) => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
           </TextField>
           <TextField
             label="Phone"
@@ -331,12 +347,31 @@ export default function CompanyUsersForm({ mode }) {
             }
             fullWidth
           />
-          <TextField
-            label="Company"
-            value={companyMe?.company_name || ""}
-            fullWidth
-            disabled
-          />
+          {role === "superadmin" ? (
+            <TextField
+              label="Company"
+              value={resolvedForm.company_id}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, company_id: event.target.value }))
+              }
+              select
+              fullWidth
+            >
+              <MenuItem value="">Select Company</MenuItem>
+              {companies.map((company) => (
+                <MenuItem key={company.id} value={company.id}>
+                  {company.company_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              label="Company"
+              value={companyMe?.company_name || ""}
+              fullWidth
+              disabled
+            />
+          )}
         </Box>
 
         <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
@@ -352,7 +387,12 @@ export default function CompanyUsersForm({ mode }) {
                 ? "Update User"
                 : "Create User"}
           </Button>
-          <Button variant="outlined" onClick={() => navigate("/admin/company-users")}>
+          <Button
+            variant="outlined"
+            onClick={() =>
+              navigate(role === "admin" ? "/admin/company-users" : "/super-admin/company-users")
+            }
+          >
             Cancel
           </Button>
         </Stack>
