@@ -20,6 +20,7 @@ import {
   clearQuestionDetailState,
   fetchQuestionById,
 } from "../../store/questionSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 
 export default function QuestionsView() {
@@ -32,6 +33,8 @@ export default function QuestionsView() {
   const { selectedQuestion, detailLoading, detailError } = useSelector(
     (state) => state.question,
   );
+  const { canEdit } = usePermissions();
+  const canEditQuestions = canEdit("questions");
 
   useEffect(() => {
     dispatch(fetchQuestionById(id));
@@ -109,13 +112,15 @@ export default function QuestionsView() {
             >
               Back to list
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/admin/questions/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {canEditQuestions && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() => navigate(`/admin/questions/${id}/edit`)}
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 

@@ -23,6 +23,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import Layout from "../../layouts/commonLayout/Layout";
 import { fetchCompanies } from "../../store/companySlice";
 import { fetchKpiById, fetchKpis } from "../../store/kpiSlice";
+import { fetchThemes } from "../../store/themeSlice";
 import {
   clearChallengeCreateState,
   clearChallengeDetailState,
@@ -34,6 +35,7 @@ import {
 } from "../../store/challengeSlice";
 import { getSurfaceBackground } from "../../theme";
 import { getCompanyId } from "../../utils/roleHelper";
+import usePermissions from "../../hooks/usePermissions";
 
 const CHALLENGE_ICON_OPTIONS = [
   { value: "🏆", label: "Trophy" },
@@ -73,6 +75,7 @@ export default function ChallengeForm({ mode, role = "superadmin" }) {
   const { id } = useParams();
   const { companies } = useSelector((state) => state.company);
   const { items: kpiItems } = useSelector((state) => state.kpi);
+  const { items: themeItems } = useSelector((state) => state.theme);
   const {
     selectedChallenge,
     createLoading,
@@ -96,6 +99,8 @@ export default function ChallengeForm({ mode, role = "superadmin" }) {
   const [draftMappings, setDraftMappings] = useState([defaultMapping()]);
   const [hasStartedEditing, setHasStartedEditing] = useState(false);
   const [formError, setFormError] = useState("");
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("challenges") : canCreate("challenges");
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -192,8 +197,18 @@ export default function ChallengeForm({ mode, role = "superadmin" }) {
   useEffect(() => {
     if (selectedCompanyId) {
       dispatch(fetchKpis({ isActive: true, companyId: selectedCompanyId }));
+      dispatch(fetchThemes({ isActive: true, companyId: selectedCompanyId }));
     }
   }, [dispatch, selectedCompanyId]);
+
+  const themeNameByKey = useMemo(
+    () =>
+      themeItems.reduce((accumulator, item) => {
+        accumulator[item.theme_key] = item.theme_display_name;
+        return accumulator;
+      }, {}),
+    [themeItems],
+  );
 
   const getKpiDatesFromList = (kpiKey) => {
     const selectedKpi = filteredKpis.find((item) => item.kpi_key === kpiKey);
@@ -745,7 +760,7 @@ export default function ChallengeForm({ mode, role = "superadmin" }) {
                       </MenuItem>
                       {filteredKpis.map((kpi) => (
                         <MenuItem key={kpi.kpi_key} value={kpi.kpi_key}>
-                          {kpi.display_name}
+                          {`${themeNameByKey[kpi.theme_key] || kpi.theme_key || "Unknown Theme"} - ${kpi.display_name}`}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -784,14 +799,16 @@ export default function ChallengeForm({ mode, role = "superadmin" }) {
           </Stack>
 
           <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-            <Button
-              variant="contained"
-              startIcon={<SaveRoundedIcon />}
-              onClick={handleSave}
-              disabled={createLoading || updateLoading}
-            >
-              {createLoading || updateLoading ? "Saving..." : "Save"}
-            </Button>
+            {canSubmitForm && (
+              <Button
+                variant="contained"
+                startIcon={<SaveRoundedIcon />}
+                onClick={handleSave}
+                disabled={createLoading || updateLoading}
+              >
+                {createLoading || updateLoading ? "Saving..." : "Save"}
+              </Button>
+            )}
             <Button variant="outlined" onClick={() => navigate("/admin/challenges")}>
               Cancel
             </Button>

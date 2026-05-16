@@ -1,6 +1,8 @@
 import axios from "axios";
 import { clearAuthSession, getToken } from "../utils/roleHelper";
 
+const RBAC_STORAGE_KEYS = ["rbac_permissions", "rbac_menus", "rbac_policy"];
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
@@ -25,6 +27,7 @@ const isTokenExpired = (token) => {
 
 const redirectToLogin = () => {
   clearAuthSession();
+  RBAC_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
 
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
     window.location.replace("/login");
@@ -102,6 +105,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Spec §7: backend now returns 403 detail strings as `Missing permission 'X:Y'`.
+// Pull the codename out so we can flag it in dev — UI gating that misses a
+// codename should be caught early.
+const MISSING_PERMISSION_PATTERN = /Missing permission '([^']+)'/i;
+
 api.interceptors.response.use(
   (response) => {
     const contentType = response?.headers?.["content-type"] || "";
@@ -114,6 +122,21 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     if (status === 401) {
       redirectToLogin();
+    }
+    // 403 is intentionally NOT auto-redirected. Individual screens surface
+    // the error (or render an empty state); a single forbidden call should
+    // not kick the user out of the page they just opened.
+    if (status === 403 && import.meta.env.DEV) {
+      const detail =
+        typeof error?.response?.data?.detail === "string"
+          ? error.response.data.detail
+          : error?.response?.data?.message;
+      const match = detail?.match?.(MISSING_PERMISSION_PATTERN);
+      if (match) {
+        console.warn(
+          `[RBAC] Missing permission "${match[1]}" on ${error?.config?.method?.toUpperCase?.() || "REQUEST"} ${error?.config?.url || ""} — UI gating should have prevented this call.`,
+        );
+      }
     }
 
     const contentType = error?.response?.headers?.["content-type"] || "";

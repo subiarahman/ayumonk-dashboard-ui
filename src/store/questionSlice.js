@@ -208,12 +208,14 @@ export const deleteQuestion = createAsyncThunk(
 
 export const uploadQuestionFile = createAsyncThunk(
   "question/uploadQuestionFile",
-  async (file, { rejectWithValue }) => {
+  async ({ file, companyId }, { rejectWithValue }) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await api.post(API_URLS.questionUpload, formData);
+      const response = await api.post(API_URLS.questionUpload, formData, {
+        params: companyId ? { company_id: companyId } : undefined,
+      });
       const payload = response?.data || {};
 
       if (!payload?.success) {

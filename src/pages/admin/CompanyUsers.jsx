@@ -40,6 +40,8 @@ import { getSurfaceBackground } from "../../theme";
 import { downloadTemplateFile } from "../../utils/downloadTemplate";
 import { formatDateTimeIST } from "../../utils/dateTime";
 import { getCompanyId } from "../../utils/roleHelper";
+import useTenantContext from "../../hooks/useTenantContext";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function CompanyUsers({ role = "admin" }) {
   const theme = useTheme();
@@ -75,17 +77,22 @@ export default function CompanyUsers({ role = "admin" }) {
     status: uploadStatus,
   } = useSelector((state) => state.userUpload);
 
-  const companyId = role === "admin" ? getCompanyId() : "";
+  const { isPlatformAdmin, companyIdForRequest } = useTenantContext();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateCompanyUsers = canCreate("company-users");
+  const canEditCompanyUsers = canEdit("company-users");
+  const canDeleteCompanyUsers = canDelete("company-users");
 
   useEffect(() => {
     dispatch(fetchCompanies());
   }, [dispatch]);
 
   const getUserListParams = useCallback(() => {
-    const resolvedCompanyId =
-      role === "admin"
-        ? companyId
-        : appliedFilters.companyId.trim();
+    // Spec §7: tenant users never send company_id (backend uses JWT). Platform
+    // admins attach the active tenant they picked OR the explicit list filter.
+    const resolvedCompanyId = isPlatformAdmin
+      ? appliedFilters.companyId.trim() || companyIdForRequest
+      : "";
 
     return {
       ...(resolvedCompanyId ? { companyId: resolvedCompanyId } : {}),
@@ -95,7 +102,13 @@ export default function CompanyUsers({ role = "admin" }) {
           ? undefined
           : appliedFilters.status === "active",
     };
-  }, [appliedFilters.companyId, appliedFilters.search, appliedFilters.status, companyId, role]);
+  }, [
+    appliedFilters.companyId,
+    appliedFilters.search,
+    appliedFilters.status,
+    companyIdForRequest,
+    isPlatformAdmin,
+  ]);
 
   useEffect(() => {
     dispatch(fetchUsers(getUserListParams()));
@@ -120,7 +133,6 @@ export default function CompanyUsers({ role = "admin" }) {
 
   const handleDelete = useCallback(
     async (userId, fullName) => {
-      if (role === "admin") return;
       if (!window.confirm(`Delete user "${fullName}"?`)) return;
 
       try {
@@ -129,7 +141,7 @@ export default function CompanyUsers({ role = "admin" }) {
         // Redux state already stores the error.
       }
     },
-    [dispatch, role],
+    [dispatch],
   );
 
   const handleImport = async (event) => {
@@ -197,11 +209,6 @@ export default function CompanyUsers({ role = "admin" }) {
         minWidth: 150,
       },
       {
-        field: "location",
-        headerName: "Location",
-        minWidth: 150,
-      },
-      {
         field: "gender",
         headerName: "Gender",
         minWidth: 120,
@@ -230,6 +237,12 @@ export default function CompanyUsers({ role = "admin" }) {
         renderCell: ({ value }) => companyNameById[value] || value || "-",
       },
       {
+        field: "role_name",
+        headerName: "Role",
+        minWidth: 150,
+        valueGetter: (_, row) => row.role_name || "-",
+      },
+      {
         field: "is_active",
         headerName: "Status",
         minWidth: 120,
@@ -251,38 +264,13 @@ export default function CompanyUsers({ role = "admin" }) {
       },
     ];
 
-    if (role === "admin") {
-      return [
-        ...baseColumns,
-        {
-          field: "actions",
-          headerName: "Actions",
-          sortable: false,
-          filterable: false,
-          minWidth: 120,
-          renderCell: ({ row }) => (
-            <Stack direction="row" spacing={0.5}>
-              <Tooltip title="View">
-                <IconButton
-                  size="small"
-                  onClick={() => navigate(`/admin/company-users/${row.id}`)}
-                >
-                  <PreviewRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Edit">
-                <IconButton
-                  size="small"
-                  onClick={() => navigate(`/admin/company-users/${row.id}/edit`)}
-                >
-                  <EditRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          ),
-        },
-      ];
-    }
+    const isAdminPath = role === "admin";
+    const viewPath = (id) =>
+      isAdminPath ? `/admin/company-users/${id}` : `/super-admin/company-users/${id}`;
+    const editPath = (id) =>
+      isAdminPath
+        ? `/admin/company-users/${id}/edit`
+        : `/super-admin/company-users/${id}/edit`;
 
     return [
       ...baseColumns,
@@ -295,38 +283,47 @@ export default function CompanyUsers({ role = "admin" }) {
         renderCell: ({ row }) => (
           <Stack direction="row" spacing={0.5}>
             <Tooltip title="View">
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/super-admin/company-users/${row.id}`)}
-              >
+              <IconButton size="small" onClick={() => navigate(viewPath(row.id))}>
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/super-admin/company-users/${row.id}/edit`)}
-              >
-                <EditRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <span>
+            {canEditCompanyUsers && (
+              <Tooltip title="Edit">
                 <IconButton
                   size="small"
-                  color="error"
-                  disabled={deleteLoading}
-                  onClick={() => handleDelete(row.id, row.full_name)}
+                  onClick={() => navigate(editPath(row.id))}
                 >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
+                  <EditRoundedIcon fontSize="small" />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            )}
+            {canDeleteCompanyUsers && (
+              <Tooltip title="Delete">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.id, row.full_name)}
+                  >
+                    <DeleteOutlineRoundedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Stack>
         ),
       },
     ];
-  }, [companyNameById, deleteLoading, handleDelete, navigate, role]);
+  }, [
+    canDeleteCompanyUsers,
+    canEditCompanyUsers,
+    companyNameById,
+    deleteLoading,
+    handleDelete,
+    navigate,
+    role,
+  ]);
 
   return (
     <Layout role={role} title="Company User Data">
@@ -369,45 +366,56 @@ export default function CompanyUsers({ role = "admin" }) {
               </Typography>
             </Box>
 
-            {role === "superadmin" && (
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {canCreateCompanyUsers && (
                 <Button
                   variant="contained"
                   startIcon={<AddRoundedIcon />}
-                  onClick={() => navigate("/super-admin/company-users/add")}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? "/admin/company-users/add"
+                        : "/super-admin/company-users/add",
+                    )
+                  }
                   sx={{ height: 40, px: 2.5, whiteSpace: "nowrap" }}
                 >
                   Add User
                 </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<FileDownloadRoundedIcon />}
-                  onClick={handleDownloadFormat}
-                  sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-                >
-                  Download format
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<UploadFileRoundedIcon />}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadLoading}
-                  sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-                >
-                  {uploadLoading ? "Uploading..." : "Import Excel"}
-                </Button>
-              </Stack>
-            )}
-
-            <Button
-              variant="outlined"
-              startIcon={<RefreshRoundedIcon />}
-              onClick={() => dispatch(fetchUsers(getUserListParams()))}
-              disabled={usersLoading}
-              sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
-            >
-              Refresh
-            </Button>
+              )}
+              {role === "superadmin" && (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownloadRoundedIcon />}
+                    onClick={handleDownloadFormat}
+                    sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+                  >
+                    Download format
+                  </Button>
+                  {canCreateCompanyUsers && (
+                    <Button
+                      variant="outlined"
+                      startIcon={<UploadFileRoundedIcon />}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadLoading}
+                      sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+                    >
+                      {uploadLoading ? "Uploading..." : "Import Excel"}
+                    </Button>
+                  )}
+                </>
+              )}
+              <Button
+                variant="outlined"
+                startIcon={<RefreshRoundedIcon />}
+                onClick={() => dispatch(fetchUsers(getUserListParams()))}
+                disabled={usersLoading}
+                sx={{ height: 40, px: 2, whiteSpace: "nowrap" }}
+              >
+                Refresh
+              </Button>
+            </Stack>
           </Stack>
 
           {role === "superadmin" && (

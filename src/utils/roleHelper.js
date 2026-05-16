@@ -3,14 +3,58 @@ const ROLE_KEY = "role";
 const TOKEN_KEY = "token";
 const USER_KEY = "userProfile";
 const COMPANY_ID_KEY = "companyId";
+const PLATFORM_ADMIN_KEY = "isPlatformAdmin";
 
-export const normalizeRole = (role) =>
-  String(role || "")
+const USER_ROLE_NAMES = new Set(["user", "employee"]);
+const SUPER_ADMIN_ROLE_NAMES = new Set(["superadmin", "ayumonkadmin"]);
+
+export const normalizeRole = (role) => {
+  const cleaned = String(role || "")
     .trim()
     .toLowerCase()
     .replace(/[_\s-]+/g, "");
+  if (!cleaned) return "";
+  if (USER_ROLE_NAMES.has(cleaned)) return "user";
+  if (SUPER_ADMIN_ROLE_NAMES.has(cleaned)) return "superadmin";
+  return "admin";
+};
 
 export const getRole = () => localStorage.getItem(ROLE_KEY);
+
+export const decodeJwtPayload = (token) => {
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded =
+      base64 + "===".slice((base64.length + 3) % 4).slice(0, 0);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+};
+
+export const getIsPlatformAdmin = () =>
+  localStorage.getItem(PLATFORM_ADMIN_KEY) === "true";
+
+export const setIsPlatformAdmin = (value) => {
+  if (value === true) {
+    localStorage.setItem(PLATFORM_ADMIN_KEY, "true");
+  } else {
+    localStorage.removeItem(PLATFORM_ADMIN_KEY);
+  }
+};
+
+export const getHomePath = ({ isPlatformAdmin, role } = {}) => {
+  if (isPlatformAdmin) return "/super-admin/dashboard";
+  if (role === "user") return "/user/dashboard";
+  return "/admin/hr-dashboard";
+};
+
+// Back-compat shim used by older callers; prefer getHomePath above.
+export const getHomePathForRole = (role) =>
+  getHomePath({ isPlatformAdmin: role === "superadmin", role });
 
 export const isAuthenticated = () => localStorage.getItem(AUTH_KEY) === "true";
 
@@ -47,6 +91,7 @@ export const clearAuthSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(COMPANY_ID_KEY);
+  localStorage.removeItem(PLATFORM_ADMIN_KEY);
 };
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);

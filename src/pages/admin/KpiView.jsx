@@ -19,6 +19,7 @@ import Layout from "../../layouts/commonLayout/Layout";
 import { fetchCompanies } from "../../store/companySlice";
 import { fetchThemes } from "../../store/themeSlice";
 import { clearKpiDetailState, fetchKpiById } from "../../store/kpiSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 
 export default function KpiView() {
@@ -31,6 +32,8 @@ export default function KpiView() {
   const { selectedKpi, detailLoading, detailError } = useSelector(
     (state) => state.kpi,
   );
+  const { canEdit } = usePermissions();
+  const canEditKpis = canEdit("kpis");
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -101,13 +104,15 @@ export default function KpiView() {
             >
               Back to list
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/admin/kpis/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {canEditKpis && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() => navigate(`/admin/kpis/${id}/edit`)}
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 

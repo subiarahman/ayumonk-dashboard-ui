@@ -31,6 +31,7 @@ import {
   fetchKpis,
 } from "../../store/kpiSlice";
 import { getCompanyId } from "../../utils/roleHelper";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 
 const filterFieldSx = {
@@ -56,6 +57,10 @@ export default function Kpis({ role = "admin" }) {
   } = useSelector((state) => state.kpi);
   const { companies } = useSelector((state) => state.company);
   const { items: themeItems } = useSelector((state) => state.theme);
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateKpis = canCreate("kpis");
+  const canEditKpis = canEdit("kpis");
+  const canDeleteKpis = canDelete("kpis");
   const [filters, setFilters] = useState({
     companyId: role === "admin" ? getCompanyId() : "",
     themeKey: "",
@@ -97,8 +102,13 @@ export default function Kpis({ role = "admin" }) {
   }, [dispatch]);
 
   useEffect(() => {
-    dispatch(fetchThemes({ companyId: appliedFilters.companyId || undefined }));
-  }, [appliedFilters.companyId, dispatch]);
+    dispatch(
+      fetchThemes({
+        isActive: true,
+        companyId: filters.companyId || undefined,
+      }),
+    );
+  }, [filters.companyId, dispatch]);
 
   useEffect(() => {
     dispatch(
@@ -120,7 +130,12 @@ export default function Kpis({ role = "admin" }) {
 
   const handleRefresh = () => {
     dispatch(fetchCompanies());
-    dispatch(fetchThemes({ companyId: appliedFilters.companyId || undefined }));
+    dispatch(
+      fetchThemes({
+        isActive: true,
+        companyId: appliedFilters.companyId || undefined,
+      }),
+    );
     dispatch(
       fetchKpis({
         search: appliedFilters.search.trim(),
@@ -134,7 +149,6 @@ export default function Kpis({ role = "admin" }) {
   const handleDelete = useCallback(
     async (kpiKey) => {
       try {
-        if (role !== "superadmin") return;
         await dispatch(deleteKpi(kpiKey)).unwrap();
         dispatch(
           fetchKpis({
@@ -265,35 +279,50 @@ export default function Kpis({ role = "admin" }) {
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            {role === "superadmin" && (
-              <>
-                <Tooltip title="Edit">
+            {canEditKpis && (
+              <Tooltip title="Edit">
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? `/admin/kpis/${row.kpi_key}/edit`
+                        : `/super-admin/kpis/${row.kpi_key}/edit`,
+                    )
+                  }
+                >
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canDeleteKpis && (
+              <Tooltip title="Delete">
+                <span>
                   <IconButton
                     size="small"
-                    onClick={() => navigate(`/super-admin/kpis/${row.kpi_key}/edit`)}
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.kpi_key)}
                   >
-                    <EditRoundedIcon fontSize="small" />
+                    <DeleteOutlineRoundedIcon fontSize="small" />
                   </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete">
-                  <span>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      disabled={deleteLoading}
-                      onClick={() => handleDelete(row.kpi_key)}
-                    >
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         ),
       },
     ],
-    [companyNameById, deleteLoading, handleDelete, navigate, role, themeNameByKey],
+    [
+      canDeleteKpis,
+      canEditKpis,
+      companyNameById,
+      deleteLoading,
+      handleDelete,
+      navigate,
+      role,
+      themeNameByKey,
+    ],
   );
 
   return (
@@ -330,11 +359,17 @@ export default function Kpis({ role = "admin" }) {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              {role === "superadmin" && (
+              {canCreateKpis && (
                 <Button
                   variant="contained"
                   startIcon={<AddRoundedIcon />}
-                  onClick={() => navigate("/super-admin/kpis/add")}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? "/admin/kpis/add"
+                        : "/super-admin/kpis/add",
+                    )
+                  }
                 >
                   Add KPI
                 </Button>

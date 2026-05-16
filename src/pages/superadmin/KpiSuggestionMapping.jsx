@@ -32,6 +32,7 @@ import {
 } from "../../store/kpiSuggestionMappingSlice";
 import { fetchQuestions } from "../../store/questionSlice";
 import { fetchThemes } from "../../store/themeSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -73,6 +74,11 @@ export default function KpiSuggestionMapping() {
     deleteError,
     deleteMessage,
   } = useSelector((state) => state.kpiSuggestionMapping);
+  // "kpi-suggestion-mapping" slug → "suggestion" resource (per audit's resource map).
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateMappings = canCreate("kpi-suggestion-mapping");
+  const canEditMappings = canEdit("kpi-suggestion-mapping");
+  const canDeleteMappings = canDelete("kpi-suggestion-mapping");
 
   const [filters, setFilters] = useState({
     kpi_key: "",
@@ -151,10 +157,18 @@ export default function KpiSuggestionMapping() {
   const columns = useMemo(
     () => [
       {
-        field: "kpi_key",
-        headerName: "KPI Key",
+        field: "kpi_name",
+        headerName: "KPI",
         minWidth: 220,
         flex: 1.1,
+        valueGetter: (_, row) => row.kpi_name || row.kpi_key || "-",
+        renderCell: ({ row }) => (
+          <Tooltip title={row.kpi_key || ""} placement="top" arrow>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+              {row.kpi_name || row.kpi_key || "-"}
+            </Typography>
+          </Tooltip>
+        ),
       },
       {
         field: "trigger_mode",
@@ -171,17 +185,42 @@ export default function KpiSuggestionMapping() {
         valueGetter: (_, row) => row.risk_level || "-",
       },
       {
-        field: "question_key",
-        headerName: "Question Key",
-        minWidth: 220,
-        flex: 1,
-        valueGetter: (_, row) => row.question_key || "-",
+        field: "question_label",
+        headerName: "Question",
+        minWidth: 280,
+        flex: 1.4,
+        valueGetter: (_, row) => {
+          if (row.question_code && row.question_text) {
+            return `${row.question_code} - ${row.question_text}`;
+          }
+          return row.question_code || row.question_text || row.question_key || "-";
+        },
+        renderCell: ({ row }) => {
+          const code = row.question_code || row.question_key || "";
+          const text = row.question_text || "";
+          if (!code && !text) return "-";
+          return (
+            <Tooltip title={text || ""} placement="top" arrow>
+              <Typography variant="body2" noWrap>
+                {code && text ? `${code} - ${text}` : code || text}
+              </Typography>
+            </Tooltip>
+          );
+        },
       },
       {
-        field: "suggestion_id",
-        headerName: "Suggestion ID",
+        field: "suggestion_title",
+        headerName: "Suggestion",
         minWidth: 220,
         flex: 1,
+        valueGetter: (_, row) => row.suggestion_title || row.suggestion_id || "-",
+        renderCell: ({ row }) => (
+          <Tooltip title={row.suggestion_id || ""} placement="top" arrow>
+            <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+              {row.suggestion_title || row.suggestion_id || "-"}
+            </Typography>
+          </Tooltip>
+        ),
       },
       {
         field: "priority",
@@ -230,33 +269,37 @@ export default function KpiSuggestionMapping() {
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={() =>
-                  navigate(`/super-admin/kpi-suggestion-mapping/${row.id}/edit`)
-                }
-              >
-                <EditRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <span>
+            {canEditMappings && (
+              <Tooltip title="Edit">
                 <IconButton
                   size="small"
-                  color="error"
-                  disabled={deleteLoading}
-                  onClick={() => handleDelete(row.id)}
+                  onClick={() =>
+                    navigate(`/super-admin/kpi-suggestion-mapping/${row.id}/edit`)
+                  }
                 >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
+                  <EditRoundedIcon fontSize="small" />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            )}
+            {canDeleteMappings && (
+              <Tooltip title="Delete">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.id)}
+                  >
+                    <DeleteOutlineRoundedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDelete, navigate],
+    [canDeleteMappings, canEditMappings, deleteLoading, handleDelete, navigate],
   );
 
   const filteredQuestionItems = useMemo(() => {
@@ -311,13 +354,15 @@ export default function KpiSuggestionMapping() {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              <Button
-                variant="contained"
-                startIcon={<AddRoundedIcon />}
-                onClick={() => navigate("/super-admin/kpi-suggestion-mapping/add")}
-              >
-                Add Mapping
-              </Button>
+              {canCreateMappings && (
+                <Button
+                  variant="contained"
+                  startIcon={<AddRoundedIcon />}
+                  onClick={() => navigate("/super-admin/kpi-suggestion-mapping/add")}
+                >
+                  Add Mapping
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<RefreshRoundedIcon />}

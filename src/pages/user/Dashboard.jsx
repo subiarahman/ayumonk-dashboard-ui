@@ -48,6 +48,7 @@ import DashboardChallenges from "./DashboardChallenges";
 import {
   fetchDashboardKpis,
   fetchSessionSuggestions,
+  fetchWellnessTrends,
 } from "../../store/dashboardSlice";
 import { fetchMySubmissions } from "../../store/sessionSlice";
 import { getRaisedGradient, getSurfaceBackground } from "../../theme";
@@ -282,74 +283,130 @@ function SectionCard({ children, sx }) {
   );
 }
 
-function MetricCard({ item }) {
+function Sparkline({ values = [], color = "#0f766e", width = 110, height = 28 }) {
+  if (!Array.isArray(values) || values.length < 2) {
+    return <Box sx={{ height, width: "100%" }} />;
+  }
+  const min = Math.min(...values) - 0.2;
+  const max = Math.max(...values) + 0.2;
+  const range = max - min || 1;
+  const pts = values.map((v, i) => [
+    (i / (values.length - 1)) * width,
+    height - ((v - min) / range) * height,
+  ]);
+  const linePath = pts.map(([x, y]) => `${x},${y}`).join(" ");
+  const areaPath = `${pts[0][0]},${height} ${linePath} ${pts[pts.length - 1][0]},${height}`;
+  return (
+    <Box
+      component="svg"
+      width={width}
+      height={height}
+      sx={{ overflow: "visible", display: "block" }}
+    >
+      <polygon points={areaPath} fill={color} opacity="0.14" />
+      <polyline
+        points={linePath}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={pts[pts.length - 1][0]}
+        cy={pts[pts.length - 1][1]}
+        r="2.6"
+        fill={color}
+      />
+    </Box>
+  );
+}
+
+function KpiTile({ item, sparkValues }) {
   const theme = useTheme();
   const trendPositive = item.change.startsWith("+");
+  const trendColor = trendPositive ? "#16a34a" : "#dc2626";
+  const trendText = item.change === "No trend" ? "—" : item.change.replace(/^\+/, "");
 
   return (
     <Paper
       elevation={0}
       sx={{
-        p: 2,
+        flexShrink: 0,
+        minWidth: 168,
+        width: "100%",
+        height: "100%",
+        p: 1.75,
         borderRadius: 3,
         border: "1px solid",
         borderColor: alpha(item.color, 0.22),
-        background: `linear-gradient(180deg, ${alpha(item.color, theme.palette.mode === "dark" ? 0.16 : 0.08)} 0%, ${getRaisedGradient(theme, item.color)} 100%)`,
-        height: "100%",
+        background: `linear-gradient(180deg, ${alpha(item.color, theme.palette.mode === "dark" ? 0.18 : 0.08)} 0%, ${getSurfaceBackground(theme, theme.palette.mode === "dark" ? 0.96 : 0.92)} 100%)`,
+        transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+        "&:hover": {
+          transform: "translateY(-3px)",
+          boxShadow: `0 12px 28px ${alpha(item.color, 0.18)}`,
+          borderColor: alpha(item.color, 0.42),
+        },
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Box
           sx={{
-            width: 40,
-            height: 40,
-            borderRadius: 2.5,
+            width: 32,
+            height: 32,
+            borderRadius: 2,
             display: "grid",
             placeItems: "center",
-            bgcolor: alpha(item.color, 0.12),
+            bgcolor: alpha(item.color, 0.14),
             color: item.color,
           }}
         >
           {item.icon}
         </Box>
-        <Chip
-          label={item.change}
-          size="small"
+        <Typography
+          variant="caption"
           sx={{
-            bgcolor: trendPositive ? alpha("#16a34a", 0.14) : alpha("#dc2626", 0.12),
-            color: trendPositive ? "#15803d" : "#dc2626",
-            fontWeight: 700,
+            fontWeight: 800,
+            color: trendColor,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.4,
           }}
-        />
+        >
+          {item.change === "No trend"
+            ? "—"
+            : `${trendPositive ? "▲" : "▼"} ${trendText.replace(/^-/, "")}`}
+        </Typography>
       </Stack>
-
       <Typography
-        variant="body2"
-        sx={{ mt: 1.5, color: item.color, fontWeight: 700 }}
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          display: "block",
+          mt: 1,
+          fontWeight: 700,
+          letterSpacing: 0.3,
+          textTransform: "uppercase",
+          fontSize: 10.5,
+          lineHeight: 1.2,
+        }}
       >
         {item.label}
       </Typography>
       <Typography
-        variant="h4"
-        sx={{ mt: 0.5, fontWeight: 800, color: item.color }}
-      >
-        {item.score}
-      </Typography>
-      <LinearProgress
-        variant="determinate"
-        value={item.progress}
         sx={{
-          mt: 2,
-          height: 8,
-          borderRadius: 999,
-          bgcolor: alpha(item.color, 0.12),
-          "& .MuiLinearProgress-bar": {
-            borderRadius: 999,
-            bgcolor: item.color,
-            backgroundImage: `linear-gradient(90deg, ${item.color} 0%, ${alpha(item.color, 0.72)} 100%)`,
-          },
+          mt: 0.25,
+          fontSize: 24,
+          fontWeight: 800,
+          color: item.color,
+          lineHeight: 1.1,
         }}
-      />
+      >
+        {Number(item.score).toFixed(1)}
+      </Typography>
+      <Box sx={{ mt: 1.25 }}>
+        <Sparkline values={sparkValues} color={item.color} />
+      </Box>
     </Paper>
   );
 }
@@ -939,6 +996,7 @@ export default function Dashboard() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("wellness");
+  const [trendsPeriod, setTrendsPeriod] = useState("weekly");
   const {
     items: dashboardItems,
     loading: dashboardLoading,
@@ -946,6 +1004,9 @@ export default function Dashboard() {
     suggestions,
     suggestionsLoading,
     suggestionsError,
+    trends,
+    trendsLoading,
+    trendsError,
   } = useSelector((state) => state.dashboard);
   const { mySubmissions } = useSelector((state) => state.session);
   const chartTooltipStyles = {
@@ -969,6 +1030,10 @@ export default function Dashboard() {
     dispatch(fetchMySubmissions());
   }, [dispatch]);
 
+  useEffect(() => {
+    dispatch(fetchWellnessTrends({ period: trendsPeriod }));
+  }, [dispatch, trendsPeriod]);
+
   const latestSubmissionSessionId = useMemo(() => {
     if (!mySubmissions.length) return "";
     return mySubmissions[0]?.session_id || "";
@@ -982,6 +1047,8 @@ export default function Dashboard() {
   const metrics = useMemo(
     () =>
       dashboardItems.map((item, index) => ({
+        kpiKey: item.kpi_key ?? null,
+        kpiName: item.kpi_name || "",
         label: formatMetricLabel(item.kpi_name),
         score: Number(item.latest_score) || 0,
         progress: clampPercent(item.latest_score),
@@ -991,6 +1058,21 @@ export default function Dashboard() {
       })),
     [dashboardItems],
   );
+
+  const sparkValuesByKpi = useMemo(() => {
+    const map = {};
+    (trends.series || []).forEach((series) => {
+      const values = (series.points || []).map((p) => Number(p.average_score) || 0);
+      if (series.kpi_key != null) map[`key:${series.kpi_key}`] = values;
+      if (series.kpi_name) map[`name:${series.kpi_name}`] = values;
+    });
+    return map;
+  }, [trends.series]);
+
+  const getSparkValues = (metric) =>
+    (metric.kpiKey != null && sparkValuesByKpi[`key:${metric.kpiKey}`]) ||
+    (metric.kpiName && sparkValuesByKpi[`name:${metric.kpiName}`]) ||
+    [];
 
   const challengeItems = useMemo(
     () =>
@@ -1151,11 +1233,6 @@ const dynamicTrendData = useMemo(() => {
                   }}
                 />
               </Tabs>
-              <Typography variant="body2" color="text.secondary">
-                {activeTab === "wellness"
-                  ? "Personal wellness journey, trends, dosha balance, and suggestions."
-                  : "Daily challenges with quick actions, XP progress, badges, and leaderboard."}
-              </Typography>
             </Stack>
           </Stack>
         </SectionCard>
@@ -1171,16 +1248,36 @@ const dynamicTrendData = useMemo(() => {
             )}
 
             {!dashboardError && !dashboardLoading && metrics.length > 0 && (
-              <Grid container spacing={2}>
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1.5,
+                  overflowX: "auto",
+                  pb: 1,
+                  scrollSnapType: "x mandatory",
+                  "&::-webkit-scrollbar": { height: 6 },
+                  "&::-webkit-scrollbar-track": {
+                    bgcolor: "transparent",
+                  },
+                  "&::-webkit-scrollbar-thumb": {
+                    bgcolor: alpha(theme.palette.text.secondary, 0.22),
+                    borderRadius: 999,
+                  },
+                }}
+              >
                 {metrics.map((item) => (
-                  <Grid
-                    key={item.label}
-                    size={{ xs: 12, sm: 4, md: 2, lg: 7 / 4, xl: 4 / 3 }}
+                  <Box
+                    key={`${item.kpiKey ?? item.label}`}
+                    sx={{
+                      flex: { xs: "0 0 168px", md: "1 1 168px" },
+                      minWidth: 168,
+                      scrollSnapAlign: "start",
+                    }}
                   >
-                    <MetricCard item={item} />
-                  </Grid>
+                    <KpiTile item={item} sparkValues={getSparkValues(item)} />
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             )}
 
             {!dashboardError && !dashboardLoading && metrics.length === 0 && (
@@ -1297,59 +1394,132 @@ const dynamicTrendData = useMemo(() => {
                         Wellness Trends
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Weekly movement across your strongest improvement areas
+                        {trendsPeriod === "daily"
+                          ? "Daily"
+                          : trendsPeriod === "monthly"
+                            ? "Monthly"
+                            : "Weekly"}{" "}
+                        movement across your strongest improvement areas
                       </Typography>
                     </Box>
                     <Stack direction="row" spacing={1}>
-                      <Chip label="Daily" size="small" variant="outlined" />
-                      <Chip label="Weekly" size="small" color="primary" />
-                      <Chip label="Monthly" size="small" variant="outlined" />
+                      {[
+                        { id: "daily", label: "Daily" },
+                        { id: "weekly", label: "Weekly" },
+                        { id: "monthly", label: "Monthly" },
+                      ].map((option) => {
+                        const active = trendsPeriod === option.id;
+                        return (
+                          <Chip
+                            key={option.id}
+                            label={option.label}
+                            size="small"
+                            color={active ? "primary" : "default"}
+                            variant={active ? "filled" : "outlined"}
+                            onClick={() => setTrendsPeriod(option.id)}
+                            sx={{ cursor: "pointer", fontWeight: 700 }}
+                          />
+                        );
+                      })}
                     </Stack>
                   </Stack>
 
-                  <ResponsiveContainer width="100%" height={290}>
-                    <LineChart data={dynamicTrendData}>
-                      <XAxis dataKey="name" />
-                      <YAxis domain={[2, 5]} />
-                      <Tooltip {...chartTooltipStyles} />
-                    {dynamicWellnessData.map((kpi, index) => (
-  <Line
-    key={kpi.name}
-    type="monotone"
-    dataKey={kpi.name}
-    stroke={kpi.color}
-    strokeWidth={3}
-    dot={false}
-  />
-))}
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {trendsError && (
+                    <Alert severity="error" sx={{ mb: 1.5 }}>
+                      {trendsError}
+                    </Alert>
+                  )}
+
+                  {trends.overall.points.length === 0 ? (
+                    <Box
+                      sx={{
+                        height: 290,
+                        display: "grid",
+                        placeItems: "center",
+                        textAlign: "center",
+                        color: "text.secondary",
+                        border: "1px dashed",
+                        borderColor: "divider",
+                        borderRadius: 2,
+                      }}
+                    >
+                      <Box sx={{ px: 2 }}>
+                        <Typography sx={{ fontSize: 32, mb: 0.5 }}>📈</Typography>
+                        <Typography variant="body2">
+                          {trendsLoading
+                            ? "Loading wellness trends…"
+                            : trends.insight ||
+                              "No submissions yet — your trend chart will appear here after your first session."}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={290}>
+                      <LineChart data={trends.overall.points}>
+                        <XAxis dataKey="bucket_label" />
+                        <YAxis domain={[0, 5]} ticks={[1, 2, 3, 4, 5]} />
+                        <Tooltip
+                          {...chartTooltipStyles}
+                          formatter={(value) => [Number(value).toFixed(2), "Score"]}
+                          labelFormatter={(label, items) => {
+                            const at = items?.[0]?.payload?.bucket_at;
+                            if (!at) return label;
+                            try {
+                              const date = new Date(at);
+                              if (Number.isNaN(date.getTime())) return label;
+                              return `${label} · ${date.toLocaleDateString()}`;
+                            } catch {
+                              return label;
+                            }
+                          }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="average_score"
+                          stroke={trends.overall.color || "#fb923c"}
+                          strokeWidth={3}
+                          dot={false}
+                          isAnimationActive={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
 
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
                     spacing={1}
+                    alignItems={{ sm: "center" }}
+                    useFlexGap
+                    flexWrap="wrap"
                     sx={{ mt: 1.5 }}
                   >
-                    <Chip
-                      label="Social +17%"
-                      sx={{
-                        bgcolor: alpha("#d946ef", 0.1),
-                        color: "#a21caf",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Chip
-                      label="Hydration +15%"
-                      sx={{
-                        bgcolor: alpha("#0284c7", 0.1),
-                        color: "#0369a1",
-                        fontWeight: 700,
-                      }}
-                    />
-                    <Typography variant="body2" color="text.secondary">
-                      Most stable gains are showing up in hydration and
-                      recovery.
-                    </Typography>
+                    {trends.top_improvements
+                      .filter((item) => item.delta_percent > 0)
+                      .slice(0, 2)
+                      .map((item) => {
+                        const matched = trends.series.find(
+                          (series) =>
+                            series.kpi_key === item.kpi_key ||
+                            series.kpi_name === item.kpi_name,
+                        );
+                        const accent = matched?.color || theme.palette.primary.main;
+                        return (
+                          <Chip
+                            key={`${item.kpi_key || item.kpi_name}-improve`}
+                            label={`${item.kpi_name} +${Math.round(item.delta_percent)}%`}
+                            sx={{
+                              bgcolor: alpha(accent, 0.12),
+                              color: accent,
+                              fontWeight: 700,
+                            }}
+                          />
+                        );
+                      })}
+                    {trends.insight && (
+                      <Typography variant="body2" color="text.secondary">
+                        {trends.insight}
+                      </Typography>
+                    )}
                   </Stack>
                 </SectionCard>
               </Grid>

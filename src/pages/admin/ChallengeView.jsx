@@ -21,6 +21,7 @@ import {
   clearChallengeDetailState,
   fetchChallengeById,
 } from "../../store/challengeSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
 export default function ChallengeView({ role = "superadmin" }) {
@@ -33,6 +34,8 @@ export default function ChallengeView({ role = "superadmin" }) {
   const { selectedChallenge, detailLoading, detailError } = useSelector(
     (state) => state.challenge,
   );
+  const { canEdit } = usePermissions();
+  const canEditChallenges = canEdit("challenges");
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -113,13 +116,21 @@ export default function ChallengeView({ role = "superadmin" }) {
               >
                 Back to list
               </Button>
-              <Button
-                variant="contained"
-                startIcon={<EditRoundedIcon />}
-                onClick={() => navigate(`/admin/challenges/${id}/edit`)}
-              >
-                Edit
-              </Button>
+              {canEditChallenges && (
+                <Button
+                  variant="contained"
+                  startIcon={<EditRoundedIcon />}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? `/admin/challenges/${id}/edit`
+                        : `/super-admin/challenges/${id}/edit`,
+                    )
+                  }
+                >
+                  Edit
+                </Button>
+              )}
             </Stack>
           </Stack>
 
@@ -262,7 +273,7 @@ export default function ChallengeView({ role = "superadmin" }) {
               This challenge currently includes the following KPI assignments.
             </Typography>
 
-            {!!mappingRows.length ? (
+            {mappingRows.length > 0 ? (
               <Stack spacing={1.5}>
                 {mappingRows.map((mapping) => (
                   <Paper

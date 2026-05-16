@@ -17,6 +17,8 @@ import {
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
 import { clearAuthError, loginUser, setAuthError } from "../../store/authSlice";
+import { loadAuthorization } from "../../store/permissionSlice";
+import { getHomePath } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
 
 export default function Login() {
@@ -46,16 +48,17 @@ export default function Login() {
         }),
       ).unwrap();
 
+      await dispatch(loadAuthorization({ force: true }));
+
       const redirectTarget = location.state?.from?.pathname
         ? `${location.state.from.pathname}${location.state.from.search || ""}${location.state.from.hash || ""}`
         : null;
       const target =
         redirectTarget ||
-        (result.role === "superadmin"
-          ? "/super-admin/dashboard"
-          : result.role === "admin"
-            ? "/admin/dashboard"
-            : "/user/dashboard");
+        getHomePath({
+          isPlatformAdmin: result.isPlatformAdmin,
+          role: result.role,
+        });
       navigate(target, { replace: true });
     } catch {
       // Error state is already handled by auth slice.
@@ -98,7 +101,7 @@ export default function Login() {
         }}
       >
         <Typography variant="h4" sx={{ mb: 1 }}>
-          Google Dashboard Login
+          Sign in to AYUMONK 
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           Sign in to continue to your workspace.

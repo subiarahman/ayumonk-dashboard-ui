@@ -1,9 +1,12 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import api, { getApiErrorMessage } from "../services/api";
 import { API_URLS } from "../services/apiUrls";
+import authService from "../services/authService";
 import {
   clearAuthSession,
+  decodeJwtPayload,
   getCompanyId,
+  getIsPlatformAdmin,
   getRole,
   getToken,
   getUserProfile,
@@ -11,6 +14,7 @@ import {
   normalizeRole,
   setAuthSession,
   setCompanyId,
+  setIsPlatformAdmin,
   updateStoredProfile,
 } from "../utils/roleHelper";
 
@@ -19,6 +23,8 @@ const initialState = {
   role: getRole(),
   token: getToken(),
   user: getUserProfile(),
+  isPlatformAdmin: getIsPlatformAdmin(),
+  jwtTenantId: decodeJwtPayload(getToken())?.tenant_id || "",
   loading: false,
   error: null,
 };
@@ -37,16 +43,22 @@ export const loginUser = createAsyncThunk(
         return rejectWithValue("Login response is invalid.");
       }
 
+      const claims = decodeJwtPayload(accessToken) || {};
       const normalizedRole = normalizeRole(user.role);
+      const isPlatformAdmin = Boolean(claims.is_platform_admin);
+      const jwtTenantId = claims.tenant_id || "";
       const payload = {
         token: accessToken,
         role: normalizedRole,
+        isPlatformAdmin,
+        jwtTenantId,
         user: {
           id: user.id,
           name: user.username,
           email: user.email,
           role: normalizedRole,
-          company_id: user.company_id || getCompanyId() || "",
+          company_id:
+            user.company_id || jwtTenantId || getCompanyId() || "",
         },
       };
 
@@ -59,6 +71,14 @@ export const loginUser = createAsyncThunk(
         companyId: payload.user.company_id,
       });
       setCompanyId(payload.user.company_id);
+      setIsPlatformAdmin(isPlatformAdmin);
+
+      authService.clear();
+      try {
+        await authService.loadAuthorization({ force: true });
+      } catch {
+        // Authorization fetch failures should not block login; the slice will retry on demand.
+      }
 
       return payload;
     } catch (requestError) {
@@ -78,10 +98,13 @@ const authSlice = createSlice({
   reducers: {
     logout(state) {
       clearAuthSession();
+      authService.clear();
       state.isAuthenticated = false;
       state.role = null;
       state.token = null;
       state.user = null;
+      state.isPlatformAdmin = false;
+      state.jwtTenantId = "";
       state.loading = false;
       state.error = null;
     },
@@ -121,6 +144,8 @@ const authSlice = createSlice({
         state.role = action.payload.role;
         state.token = action.payload.token;
         state.user = action.payload.user;
+        state.isPlatformAdmin = action.payload.isPlatformAdmin;
+        state.jwtTenantId = action.payload.jwtTenantId;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;

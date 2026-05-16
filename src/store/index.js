@@ -12,10 +12,24 @@ import challengeReducer from "./challengeSlice";
 import dashboardReducer from "./dashboardSlice";
 import adminSuggestionReducer from "./adminSuggestionSlice";
 import kpiSuggestionMappingReducer from "./kpiSuggestionMappingSlice";
+import permissionReducer from "./permissionSlice";
+import roleReducer from "./roleSlice";
+import permissionMasterReducer from "./permissionMasterSlice";
+import policyReducer from "./policySlice";
+import roleAssignmentReducer from "./roleAssignmentSlice";
+import userOverridesReducer from "./userOverridesSlice";
+import menuMasterReducer from "./menuMasterSlice";
+import departmentReducer from "./departmentSlice";
+import locationReducer from "./locationSlice";
+import tenantContextReducer from "./tenantContextSlice";
+import reminderSettingsReducer from "./reminderSettingsSlice";
+import notificationsReducer from "./notificationsSlice";
+import rbacInvalidationMiddleware from "./middleware/rbacInvalidation";
 
 const store = configureStore({
   reducer: {
     auth: authReducer,
+    permission: permissionReducer,
     session: sessionReducer,
     company: companyReducer,
     user: userReducer,
@@ -28,7 +42,20 @@ const store = configureStore({
     dashboard: dashboardReducer,
     adminSuggestion: adminSuggestionReducer,
     kpiSuggestionMapping: kpiSuggestionMappingReducer,
+    role: roleReducer,
+    permissionMaster: permissionMasterReducer,
+    policy: policyReducer,
+    roleAssignment: roleAssignmentReducer,
+    userOverrides: userOverridesReducer,
+    menuMaster: menuMasterReducer,
+    department: departmentReducer,
+    location: locationReducer,
+    tenantContext: tenantContextReducer,
+    reminderSettings: reminderSettingsReducer,
+    notifications: notificationsReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(rbacInvalidationMiddleware),
 });
 
 export default store;

@@ -18,6 +18,7 @@ import {
   clearAdminSuggestionDetailState,
   fetchAdminSuggestionById,
 } from "../../store/adminSuggestionSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -29,6 +30,8 @@ export default function SuggestionView() {
   const { selectedSuggestion, detailLoading, detailError } = useSelector(
     (state) => state.adminSuggestion,
   );
+  const { canEdit } = usePermissions();
+  const canEditSuggestions = canEdit("suggestion-master");
 
   useEffect(() => {
     if (id) {
@@ -92,13 +95,17 @@ export default function SuggestionView() {
             >
               Back to list
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/super-admin/suggestion-master/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {canEditSuggestions && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() =>
+                  navigate(`/super-admin/suggestion-master/${id}/edit`)
+                }
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 

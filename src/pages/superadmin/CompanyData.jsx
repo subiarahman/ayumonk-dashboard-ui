@@ -36,6 +36,7 @@ import {
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 import { downloadTemplateFile } from "../../utils/downloadTemplate";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function CompanyData() {
   const theme = useTheme();
@@ -64,20 +65,25 @@ export default function CompanyData() {
     uploadError,
     uploadStatus,
   } = useSelector((state) => state.company);
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateCompanies = canCreate("company-data");
+  const canEditCompanies = canEdit("company-data");
+  const canDeleteCompanies = canDelete("company-data");
+
+  const getCompanyListParams = useCallback(
+    () => ({
+      search: appliedFilters.search.trim(),
+      isActive:
+        appliedFilters.status === "all"
+          ? undefined
+          : appliedFilters.status === "active",
+    }),
+    [appliedFilters.search, appliedFilters.status],
+  );
 
   useEffect(() => {
-    const isActive =
-      appliedFilters.status === "all"
-        ? undefined
-        : appliedFilters.status === "active";
-
-    dispatch(
-      fetchCompanies({
-        search: appliedFilters.search,
-        isActive,
-      }),
-    );
-  }, [appliedFilters.search, appliedFilters.status, dispatch]);
+    dispatch(fetchCompanies(getCompanyListParams()));
+  }, [dispatch, getCompanyListParams]);
 
   useEffect(() => {
     return () => {
@@ -96,15 +102,7 @@ export default function CompanyData() {
 
     try {
       await dispatch(uploadCompanyFile(file)).unwrap();
-      await dispatch(
-        fetchCompanies({
-          search: appliedFilters.search,
-          isActive:
-            appliedFilters.status === "all"
-              ? undefined
-              : appliedFilters.status === "active",
-        }),
-      ).unwrap();
+      await dispatch(fetchCompanies(getCompanyListParams())).unwrap();
       setUploadFeedback({
         severity: "success",
         message: `Company file "${file.name}" uploaded successfully.`,
@@ -119,14 +117,6 @@ export default function CompanyData() {
   const handleDownloadFormat = () => {
     downloadTemplateFile("templates/MasterData.xlsx", "MasterData.xlsx");
   };
-
-  const getCompanyListParams = () => ({
-    search: appliedFilters.search,
-    isActive:
-      appliedFilters.status === "all"
-        ? undefined
-        : appliedFilters.status === "active",
-  });
 
   const handleApplyFilters = () => {
     setAppliedFilters({
@@ -186,6 +176,13 @@ export default function CompanyData() {
         minWidth: 150,
       },
       {
+        field: "location_name",
+        headerName: "Location",
+        flex: 1,
+        minWidth: 160,
+        valueGetter: (_value, row) => row?.location_name || "-",
+      },
+      {
         field: "no_of_employees",
         headerName: "Employees",
         minWidth: 120,
@@ -226,33 +223,37 @@ export default function CompanyData() {
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={() =>
-                  navigate(`/super-admin/company-data/${row.id}/edit`)
-                }
-              >
-                <EditRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <span>
+            {canEditCompanies && (
+              <Tooltip title="Edit">
                 <IconButton
                   size="small"
-                  color="error"
-                  disabled={deleteLoading}
-                  onClick={() => handleDelete(row.id, row.company_name)}
+                  onClick={() =>
+                    navigate(`/super-admin/company-data/${row.id}/edit`)
+                  }
                 >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
+                  <EditRoundedIcon fontSize="small" />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            )}
+            {canDeleteCompanies && (
+              <Tooltip title="Delete">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.id, row.company_name)}
+                  >
+                    <DeleteOutlineRoundedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDelete, navigate],
+    [canDeleteCompanies, canEditCompanies, deleteLoading, handleDelete, navigate],
   );
 
   return (
@@ -300,7 +301,8 @@ export default function CompanyData() {
               </Typography>
             </Box>
 
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="nowrap">
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {canCreateCompanies && (
               <Button
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
@@ -308,39 +310,42 @@ export default function CompanyData() {
                 sx={{
                   height: 40,
                   px: 2.5,
-                  minWidth: "auto",
+                  flex: { xs: "1 1 100%", sm: "0 0 auto" },
                   whiteSpace: "nowrap",
                 }}
               >
                 Add Company
               </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<FileDownloadRoundedIcon />}
                 onClick={handleDownloadFormat}
                 sx={{
                   height: 40,
-                  minWidth: 152,
+                  flex: { xs: "1 1 100%", sm: "0 0 auto" },
                   px: 2,
                   whiteSpace: "nowrap",
                 }}
               >
                 Download format
               </Button>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileRoundedIcon />}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadLoading}
-                sx={{
-                  height: 40,
-                  minWidth: 152,
-                  px: 2,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {uploadLoading ? "Uploading..." : "Import Excel"}
-              </Button>
+              {canCreateCompanies && (
+                <Button
+                  variant="outlined"
+                  startIcon={<UploadFileRoundedIcon />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadLoading}
+                  sx={{
+                    height: 40,
+                    flex: { xs: "1 1 100%", sm: "0 0 auto" },
+                    px: 2,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {uploadLoading ? "Uploading..." : "Import Excel"}
+                </Button>
+              )}
               <Button
                 variant="outlined"
                 startIcon={<RefreshRoundedIcon />}
@@ -348,7 +353,7 @@ export default function CompanyData() {
                 disabled={companiesLoading}
                 sx={{
                   height: 40,
-                  minWidth: 152,
+                  flex: { xs: "1 1 100%", sm: "0 0 auto" },
                   px: 2,
                   py: 1.1,
                   whiteSpace: "nowrap",
@@ -376,7 +381,7 @@ export default function CompanyData() {
             Total companies: {companies.length}
           </Typography>
 
-          {/* <Box
+          <Box
             sx={{
               display: "grid",
               gap: 1.5,
@@ -384,7 +389,7 @@ export default function CompanyData() {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, minmax(0, 1fr))",
-                lg: "repeat(4, minmax(0, 1fr)) auto auto",
+                lg: "repeat(2, minmax(0, 1fr)) auto auto",
               },
               alignItems: { lg: "end" },
             }}
@@ -431,7 +436,7 @@ export default function CompanyData() {
             >
               Reset
             </Button>
-          </Box> */}
+          </Box>
 
           <Box sx={{ width: "100%", overflowX: "auto" }}>
             <Box sx={{ height: 560, width: "max-content", minWidth: "100%" }}>

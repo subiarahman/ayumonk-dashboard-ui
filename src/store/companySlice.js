@@ -46,6 +46,17 @@ const normalizeCompany = (item, index = 0) => ({
   size_bucket: item?.size_bucket || "",
   email: item?.email || "",
   phone: String(item?.phone ?? ""),
+  location_id:
+    item?.location_id != null
+      ? String(item.location_id)
+      : item?.location?.id != null
+        ? String(item.location.id)
+        : "",
+  location_name:
+    item?.location_name ||
+    item?.location?.name ||
+    (typeof item?.location === "string" ? item.location : "") ||
+    "",
   no_of_employees: item?.no_of_employees ?? "",
   is_active: Boolean(item?.is_active),
   created_at: item?.created_at || "",
@@ -132,22 +143,20 @@ export const fetchCompanyById = createAsyncThunk(
 
 export const createCompany = createAsyncThunk(
   "company/createCompany",
-  async ({ company, admin }, { rejectWithValue }) => {
+  async ({ company }, { rejectWithValue }) => {
     try {
-      const response = await api.post(API_URLS.companies, {
-        company,
-        admin,
-      });
+      const response = await api.post(API_URLS.companies, company);
       const payload = response?.data || {};
 
-      if (!payload?.success || !payload?.data?.company) {
+      if (!payload?.success || !payload?.data) {
         return rejectWithValue(payload?.message || "Failed to create company.");
       }
 
+      const createdCompany = payload.data.company || payload.data;
       return {
-        company: normalizeCompany(payload.data.company),
+        company: normalizeCompany(createdCompany),
         admin: payload.data.admin ? normalizeAdmin(payload.data.admin) : null,
-        message: payload?.message || "Company and admin created successfully.",
+        message: payload?.message || "Company created successfully.",
       };
     } catch (error) {
       return rejectWithValue(
@@ -162,12 +171,9 @@ export const createCompany = createAsyncThunk(
 
 export const updateCompany = createAsyncThunk(
   "company/updateCompany",
-  async ({ companyId, company, admin }, { rejectWithValue }) => {
+  async ({ companyId, company }, { rejectWithValue }) => {
     try {
-      const response = await api.put(API_URLS.companyById(companyId), {
-        company,
-        ...(admin ? { admin } : {}),
-      });
+      const response = await api.put(API_URLS.companyById(companyId), company);
       const payload = response?.data || {};
 
       if (!payload?.success || !payload?.data) {

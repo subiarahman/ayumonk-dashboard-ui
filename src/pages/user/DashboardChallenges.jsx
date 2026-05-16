@@ -19,6 +19,7 @@ import {
   postDashboardChallengeAction,
 } from "../../store/dashboardSlice";
 import { getRaisedGradient, getSurfaceBackground } from "../../theme";
+import ReminderSettings from "./ReminderSettings";
 
 const challengeBadges = [
   { id: "h1", label: "Hydration Hero", icon: "💧", earned: true, level: "Gold", color: "#0284c7" },
@@ -252,21 +253,32 @@ export default function DashboardChallenges({ challenges, loading, error }) {
 
   if (loading) {
     return (
-      <SectionCard>
-        <Typography>Loading challenges...</Typography>
-      </SectionCard>
+      <Stack spacing={2.5}>
+        <SectionCard>
+          <Typography>Loading challenges...</Typography>
+        </SectionCard>
+        <ReminderSettings />
+      </Stack>
     );
   }
 
   if (error) {
-    return <Alert severity="error">{error}</Alert>;
+    return (
+      <Stack spacing={2.5}>
+        <Alert severity="error">{error}</Alert>
+        <ReminderSettings />
+      </Stack>
+    );
   }
 
   if (!challenges.length) {
     return (
-      <SectionCard>
-        <Typography>No active challenges available right now.</Typography>
-      </SectionCard>
+      <Stack spacing={2.5}>
+        <SectionCard>
+          <Typography>No active challenges available right now.</Typography>
+        </SectionCard>
+        <ReminderSettings />
+      </Stack>
     );
   }
 
@@ -276,24 +288,28 @@ export default function DashboardChallenges({ challenges, loading, error }) {
         {[
           {
             label: "Active streak",
+            icon: "🔥",
             value: "7 Days",
             note: "Day 8 unlocks a badge",
             color: "#ea580c",
           },
           {
             label: "XP today",
+            icon: "⭐",
             value: `${earnedXp} pts`,
-            note: "Earn XP from today&apos;s live challenges",
+            note: "Earn XP from today's live challenges",
             color: "#ca8a04",
           },
           {
             label: "Current level",
+            icon: "🌱",
             value: "Banyan Sapling",
             note: "Challenge progress keeps your streak alive",
             color: "#4d7c0f",
           },
           {
             label: "Progress",
+            icon: "✅",
             value: `${completedCount} / ${challenges.length}`,
             note: "Challenges completed today",
             color: "#1d4ed8",
@@ -309,12 +325,42 @@ export default function DashboardChallenges({ challenges, loading, error }) {
                 borderColor: alpha(item.color, 0.22),
                 background: getRaisedGradient(theme, item.color),
                 height: "100%",
+                transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+                "&:hover": {
+                  transform: "translateY(-3px)",
+                  boxShadow: `0 12px 28px ${alpha(item.color, 0.18)}`,
+                  borderColor: alpha(item.color, 0.42),
+                },
               }}
             >
-              <Typography variant="body2" color="text.secondary">
-                {item.label}
-              </Typography>
-              <Typography sx={{ mt: 0.5, fontSize: 28, fontWeight: 800, color: item.color }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 2,
+                    display: "grid",
+                    placeItems: "center",
+                    bgcolor: alpha(item.color, 0.14),
+                    fontSize: 16,
+                  }}
+                >
+                  {item.icon}
+                </Box>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{
+                    fontWeight: 700,
+                    letterSpacing: 0.4,
+                    textTransform: "uppercase",
+                    fontSize: 10.5,
+                  }}
+                >
+                  {item.label}
+                </Typography>
+              </Stack>
+              <Typography sx={{ mt: 1, fontSize: 26, fontWeight: 800, color: item.color, lineHeight: 1.15 }}>
                 {item.value}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
@@ -331,23 +377,37 @@ export default function DashboardChallenges({ challenges, loading, error }) {
           justifyContent="space-between"
           spacing={1}
           sx={{ mb: 1.5 }}
+          alignItems={{ sm: "center" }}
         >
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Today&apos;s Challenges
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Daily challenges are rendered from the KPI dashboard API response.
+              1 to 3 taps each — earn XP, build streaks, unlock badges.
             </Typography>
           </Box>
-          <Chip
-            label={`${earnedXp} XP earned today`}
-            sx={{
-              fontWeight: 700,
-              bgcolor: alpha(theme.palette.primary.main, 0.1),
-              color: "primary.main",
-            }}
-          />
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip
+              size="small"
+              label={`${challenges.length} active`}
+              sx={{
+                fontWeight: 700,
+                bgcolor: alpha("#16a34a", 0.12),
+                color: "#15803d",
+                border: "1px solid",
+                borderColor: alpha("#16a34a", 0.28),
+              }}
+            />
+            <Chip
+              label={`${earnedXp} XP earned today`}
+              sx={{
+                fontWeight: 700,
+                bgcolor: alpha(theme.palette.primary.main, 0.1),
+                color: "primary.main",
+              }}
+            />
+          </Stack>
         </Stack>
 
         <Box sx={{ mb: 2 }}>
@@ -409,79 +469,86 @@ export default function DashboardChallenges({ challenges, loading, error }) {
                       ? `linear-gradient(180deg, ${alpha(color, 0.08)} 0%, ${getSurfaceBackground(theme, theme.palette.mode === "dark" ? 0.98 : 0.94)} 100%)`
                       : getSurfaceBackground(theme),
                     height: "100%",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+                    "&:hover": {
+                      transform: "translateY(-3px)",
+                      boxShadow: `0 14px 30px ${alpha(color, 0.18)}`,
+                      borderColor: alpha(color, done ? 0.55 : 0.4),
+                    },
                   }}
                 >
+                  {done && (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 10,
+                        right: 12,
+                        px: 1,
+                        py: 0.25,
+                        borderRadius: 1.5,
+                        bgcolor: alpha(color, 0.16),
+                        color,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: 0.3,
+                        border: "1px solid",
+                        borderColor: alpha(color, 0.32),
+                      }}
+                    >
+                      ✓ +{xp} XP
+                    </Box>
+                  )}
                   <Stack spacing={1.5} sx={{ height: "100%" }}>
-                    <Stack direction="row" justifyContent="space-between" spacing={1}>
-                      <Stack direction="row" spacing={1.2} alignItems="center">
-                        <Box
+                    <Stack direction="row" spacing={1.2} alignItems="center" sx={{ pr: done ? 7 : 0 }}>
+                      <Box
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 2.75,
+                          display: "grid",
+                          placeItems: "center",
+                          bgcolor: alpha(accent.primary, 0.12),
+                          boxShadow: `inset 0 0 0 1px ${alpha(accent.primary, 0.16)}`,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Typography sx={{ fontSize: 24, lineHeight: 1 }}>
+                          {challenge.icon || "🎯"}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
                           sx={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 2.75,
-                            display: "grid",
-                            placeItems: "center",
-                            bgcolor: alpha(accent.primary, 0.12),
-                            boxShadow: `inset 0 0 0 1px ${alpha(accent.primary, 0.16)}`,
+                            fontWeight: 900,
+                            fontSize: 17,
+                            lineHeight: 1.2,
+                            color: done ? accent.primary : alpha(accent.primary, 0.92),
+                            textShadow: done
+                              ? `0 0 18px ${alpha(accent.primary, 0.18)}`
+                              : "none",
                           }}
+                          noWrap
+                          title={challenge.name}
                         >
-                          <Typography sx={{ fontSize: 24, lineHeight: 1 }}>
-                            {challenge.icon || "🎯"}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography
-                            sx={{
-                              fontWeight: 900,
-                              fontSize: 18,
-                              lineHeight: 1.2,
-                              color: done ? accent.primary : alpha(accent.primary, 0.92),
-                              textShadow: done
-                                ? `0 0 18px ${alpha(accent.primary, 0.18)}`
-                                : "none",
-                            }}
-                          >
-                            {challenge.name}
-                          </Typography>
-                          <Stack direction="row" spacing={0.75} sx={{ mt: 0.75 }} useFlexGap flexWrap="wrap">
-                            <Chip
-                              size="small"
-                              label={challenge.challenge_type}
+                          {challenge.name}
+                        </Typography>
+                        <Stack direction="row" spacing={0.75} sx={{ mt: 0.6 }} useFlexGap flexWrap="wrap">
+                          {challenge.kpi_name && (
+                            <Typography
+                              variant="caption"
                               sx={{
-                                height: 24,
-                                fontWeight: 800,
-                                color: accent.primary,
-                                bgcolor: alpha(accent.primary, 0.12),
-                                border: "1px solid",
-                                borderColor: alpha(accent.primary, 0.25),
+                                color: alpha(accent.primary, 0.85),
+                                fontWeight: 700,
+                                fontSize: 10.5,
                               }}
-                            />
-                            <Chip
-                              size="small"
-                              label={`${Number(challenge.xp_reward) || 0} XP`}
-                              sx={{
-                                height: 24,
-                                fontWeight: 800,
-                                color: done ? "#15803d" : color,
-                                bgcolor: done ? alpha("#16a34a", 0.12) : alpha(accent.secondary, 0.1),
-                                border: "1px solid",
-                                borderColor: done ? alpha("#16a34a", 0.24) : alpha(accent.secondary, 0.2),
-                              }}
-                            />
-                          </Stack>
-                        </Box>
-                      </Stack>
-                      {done && (
-                        <Chip
-                          size="small"
-                          label={`+${xp} XP`}
-                          sx={{
-                            bgcolor: alpha(color, 0.12),
-                            color,
-                            fontWeight: 700,
-                          }}
-                        />
-                      )}
+                            >
+                              {challenge.kpi_name} KPI · {Number(challenge.xp_reward) || 0} XP
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
                     </Stack>
 
                     {actionResult?.message && (
@@ -814,6 +881,8 @@ export default function DashboardChallenges({ challenges, loading, error }) {
           </SectionCard>
         </Grid>
       </Grid>
+
+      <ReminderSettings />
     </Stack>
   );
 }

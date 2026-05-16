@@ -42,11 +42,48 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import LabelOutlinedIcon from "@mui/icons-material/LabelOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import VpnKeyOutlinedIcon from "@mui/icons-material/VpnKeyOutlined";
+import PolicyOutlinedIcon from "@mui/icons-material/PolicyOutlined";
+import ManageAccountsOutlinedIcon from "@mui/icons-material/ManageAccountsOutlined";
+import MenuBookOutlinedIcon from "@mui/icons-material/MenuBookOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
 import { useThemeMode } from "../../context/ThemeModeContext";
+import usePermissions from "../../hooks/usePermissions";
+import { resolveRouteForSlug } from "../../utils/permissions";
+import NotificationBell from "../../components/NotificationBell";
+import PWAInstallBanner from "../../components/PWAInstallBanner";
+import TenantSwitcher from "../../components/TenantSwitcher";
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 88;
 const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
+
+const ICON_BY_SLUG = {
+  dashboard: <DashboardIcon />,
+  "company-data": <BusinessIcon />,
+  "company-details": <BusinessIcon />,
+  "company-users": <PeopleIcon />,
+  departments: <AccountTreeOutlinedIcon />,
+  questions: <QuizIcon />,
+  themes: <CategoryIcon />,
+  kpis: <AssessmentIcon />,
+  challenges: <EmojiEventsIcon />,
+  sessions: <EventIcon />,
+  "suggestion-master": <TipsAndUpdatesRoundedIcon />,
+  "kpi-suggestion-mapping": <LinkRoundedIcon />,
+  roles: <BadgeOutlinedIcon />,
+  permissions: <VpnKeyOutlinedIcon />,
+  policies: <PolicyOutlinedIcon />,
+  "role-assignments": <ManageAccountsOutlinedIcon />,
+  menus: <MenuBookOutlinedIcon />,
+  "my-responses": <AssignmentTurnedInIcon />,
+  submissions: <AssignmentTurnedInIcon />,
+  profile: <PersonIcon />,
+};
+
+const iconForSlug = (slug) => ICON_BY_SLUG[slug] || <LabelOutlinedIcon />;
 
 const adminItems = [
   { label: "Dashboard", to: "/admin/dashboard", icon: <DashboardIcon /> },
@@ -65,7 +102,7 @@ const userItems = [
   { label: "Dashboard", to: "/user/dashboard", icon: <DashboardIcon /> },
   {
     label: "My Responses",
-    to: "/user/my-responses",
+    to: "/user/submissions",
     icon: <AssignmentTurnedInIcon />,
   },
 ];
@@ -86,6 +123,11 @@ const superAdminItems = [
     to: "/super-admin/company-users",
     icon: <PeopleIcon />,
   },
+  {
+    label: "Departments",
+    to: "/super-admin/departments",
+    icon: <AccountTreeOutlinedIcon />,
+  },
   { label: "Questions", to: "/super-admin/questions", icon: <QuizIcon /> },
   { label: "Themes", to: "/super-admin/themes", icon: <CategoryIcon /> },
   { label: "KPIs", to: "/super-admin/kpis", icon: <AssessmentIcon /> },
@@ -105,6 +147,23 @@ const superAdminItems = [
     to: "/super-admin/kpi-suggestion-mapping",
     icon: <LinkRoundedIcon />,
   },
+  { label: "Roles", to: "/super-admin/roles", icon: <BadgeOutlinedIcon /> },
+  {
+    label: "Permissions",
+    to: "/super-admin/permissions",
+    icon: <VpnKeyOutlinedIcon />,
+  },
+  {
+    label: "Policies",
+    to: "/super-admin/policies",
+    icon: <PolicyOutlinedIcon />,
+  },
+  {
+    label: "Role Assignments",
+    to: "/super-admin/role-assignments",
+    icon: <ManageAccountsOutlinedIcon />,
+  },
+  { label: "Menus", to: "/super-admin/menus", icon: <MenuBookOutlinedIcon /> },
 ];
 
 export default function Layout({ children, role, title }) {
@@ -121,24 +180,63 @@ export default function Layout({ children, role, title }) {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const stateRole = useSelector((state) => state.auth.role);
+  const isPlatformAdmin = useSelector(
+    (state) => state.auth.isPlatformAdmin,
+  );
   const profile = user || null;
   const effectiveRole = stateRole || role || "admin";
 
-  const navItems =
+  const { menus, loaded: permissionsLoaded } = usePermissions();
+
+  const dynamicNavItems = (menus || [])
+    .slice()
+    .sort((a, b) => {
+      const aOrder =
+        a?.order_no === null || a?.order_no === undefined
+          ? Number.POSITIVE_INFINITY
+          : Number(a.order_no);
+      const bOrder =
+        b?.order_no === null || b?.order_no === undefined
+          ? Number.POSITIVE_INFINITY
+          : Number(b.order_no);
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return String(a?.menu_name || "").localeCompare(
+        String(b?.menu_name || ""),
+      );
+    })
+    .map((menu) => ({
+      label: menu.menu_name,
+      to: resolveRouteForSlug(menu.slug, effectiveRole, { isPlatformAdmin }),
+      icon: iconForSlug(menu.slug),
+      slug: menu.slug,
+    }));
+
+  const fallbackNavItems =
     effectiveRole === "user"
-      ? [
-          ...userItems,
-          { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
-        ]
+      ? userItems
       : effectiveRole === "superadmin"
-        ? [
-            ...superAdminItems,
-            { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
-          ]
-      : [
-          ...adminItems,
-          { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
-        ];
+        ? superAdminItems
+        : adminItems;
+
+  // Platform admins (Super Admin / Ayumonk Admin) bypass RBAC entirely
+  // (per spec §1) — they always see the complete super-admin sidebar
+  // regardless of what /users/me/accessible-menus returns.
+  // Tenant users get their menus strictly from the API once bootstrap
+  // resolves; until then a fallback is shown so the layout isn't empty.
+  let navItems;
+  if (isPlatformAdmin) {
+    navItems = [
+      ...superAdminItems,
+      { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
+    ];
+  } else if (permissionsLoaded) {
+    navItems = dynamicNavItems;
+  } else {
+    navItems = [
+      ...fallbackNavItems,
+      { label: "My Profile", to: "/profile", icon: <PersonIcon /> },
+    ];
+  }
 
   const displayName = profile?.name || "Portal User";
   const displayRole = (profile?.role || effectiveRole).toUpperCase();
@@ -304,6 +402,8 @@ export default function Layout({ children, role, title }) {
           <Box
             sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1.2 }}
           >
+            {!isPlatformAdmin && <TenantSwitcher />}
+            {effectiveRole === "user" && <NotificationBell />}
             <Tooltip
               title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
@@ -415,6 +515,7 @@ export default function Layout({ children, role, title }) {
           mt: { xs: 8, sm: 9 },
         }}
       >
+        {effectiveRole === "user" && <PWAInstallBanner />}
         {children}
       </Box>
     </Box>

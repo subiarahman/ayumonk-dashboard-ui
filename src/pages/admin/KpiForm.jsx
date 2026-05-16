@@ -29,6 +29,7 @@ import {
 import { fetchCompanies } from "../../store/companySlice";
 import { getCompanyId } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
+import usePermissions from "../../hooks/usePermissions";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -52,6 +53,8 @@ export default function KpiForm({ mode, role = "superadmin" }) {
     companyId: role === "admin" ? getCompanyId() : "",
   });
   const [formError, setFormError] = useState("");
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("kpis") : canCreate("kpis");
 
   const selectedCompanyId = useMemo(
     () => (role === "superadmin" ? form.companyId : getCompanyId()),
@@ -242,9 +245,11 @@ export default function KpiForm({ mode, role = "superadmin" }) {
         </Stack>
 
         <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-          <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} disabled={createLoading || updateLoading}>
-            {createLoading || updateLoading ? "Saving..." : "Save"}
-          </Button>
+          {canSubmitForm && (
+            <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} disabled={createLoading || updateLoading}>
+              {createLoading || updateLoading ? "Saving..." : "Save"}
+            </Button>
+          )}
           <Button variant="outlined" onClick={() => navigate(role === "admin" ? "/admin/kpis" : "/super-admin/kpis")}>Cancel</Button>
         </Stack>
       </Paper>

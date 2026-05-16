@@ -30,6 +30,7 @@ import {
 import { fetchQuestions } from "../../store/questionSlice";
 import { fetchThemes } from "../../store/themeSlice";
 import { getSurfaceBackground } from "../../theme";
+import usePermissions from "../../hooks/usePermissions";
 
 const triggerModeOptions = [
   { value: "kpi_risk", label: "KPI Risk" },
@@ -194,6 +195,10 @@ export default function KpiSuggestionMappingForm({ mode }) {
     formValues.trigger_mode === "question_score" || formValues.trigger_mode === "both";
 
   const isSubmitting = createLoading || updateLoading;
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = isEdit
+    ? canEdit("kpi-suggestion-mapping")
+    : canCreate("kpi-suggestion-mapping");
   const pageTitle = useMemo(
     () => (isEdit ? "Edit KPI Suggestion Mapping" : "Add KPI Suggestion Mapping"),
     [isEdit],
@@ -504,14 +509,16 @@ export default function KpiSuggestionMappingForm({ mode }) {
           />
 
           <Stack direction="row" spacing={1.5}>
-            <Button
-              variant="contained"
-              startIcon={<SaveRoundedIcon />}
-              onClick={handleSave}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Create Mapping"}
-            </Button>
+            {canSubmitForm && (
+              <Button
+                variant="contained"
+                startIcon={<SaveRoundedIcon />}
+                onClick={handleSave}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Create Mapping"}
+              </Button>
+            )}
             <Button
               variant="outlined"
               onClick={() => navigate("/super-admin/kpi-suggestion-mapping")}

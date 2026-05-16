@@ -17,7 +17,46 @@ const initialState = {
   },
   suggestionsLoading: false,
   suggestionsError: "",
+  trends: {
+    period: "weekly",
+    bucket_count: 0,
+    overall: {
+      kpi_key: null,
+      kpi_name: "Overall",
+      color: "#fb923c",
+      points: [],
+      delta_percent: 0,
+    },
+    series: [],
+    top_improvements: [],
+    insight: "",
+  },
+  trendsLoading: false,
+  trendsError: "",
 };
+
+const normalizeTrendPoint = (point = {}) => ({
+  bucket_label: point?.bucket_label || "",
+  bucket_index: Number(point?.bucket_index) || 0,
+  bucket_at: point?.bucket_at || "",
+  average_score: Number(point?.average_score) || 0,
+});
+
+const normalizeTrendSeries = (series = {}) => ({
+  kpi_key: series?.kpi_key ?? null,
+  kpi_name: series?.kpi_name || "",
+  color: series?.color || "#22d3ee",
+  points: Array.isArray(series?.points)
+    ? series.points.map(normalizeTrendPoint)
+    : [],
+  delta_percent: Number(series?.delta_percent) || 0,
+});
+
+const normalizeImprovement = (item = {}) => ({
+  kpi_key: item?.kpi_key ?? null,
+  kpi_name: item?.kpi_name || "",
+  delta_percent: Number(item?.delta_percent) || 0,
+});
 
 const normalizeSuggestionTrigger = (item = {}) => ({
   trigger_mode: item?.trigger_mode || "",
@@ -92,6 +131,45 @@ export const postDashboardChallengeAction = createAsyncThunk(
           "Failed to submit challenge action due to server/network error.",
         ),
       });
+    }
+  },
+);
+
+export const fetchWellnessTrends = createAsyncThunk(
+  "dashboard/fetchWellnessTrends",
+  async ({ period = "weekly", bucket_count } = {}, { rejectWithValue }) => {
+    try {
+      const params = { period };
+      if (bucket_count) params.bucket_count = bucket_count;
+      const response = await api.get(API_URLS.dashboardWellnessTrends, {
+        params,
+      });
+      const payload = response?.data || {};
+      if (!payload?.success) {
+        return rejectWithValue(
+          payload?.message || "Failed to fetch wellness trends.",
+        );
+      }
+      const data = payload?.data || {};
+      return {
+        period: data?.period || period,
+        bucket_count: Number(data?.bucket_count) || 0,
+        overall: normalizeTrendSeries(data?.overall),
+        series: Array.isArray(data?.series)
+          ? data.series.map(normalizeTrendSeries)
+          : [],
+        top_improvements: Array.isArray(data?.top_improvements)
+          ? data.top_improvements.map(normalizeImprovement)
+          : [],
+        insight: data?.insight || "",
+      };
+    } catch (error) {
+      return rejectWithValue(
+        getApiErrorMessage(
+          error,
+          "Failed to fetch wellness trends due to server/network error.",
+        ),
+      );
     }
   },
 );
@@ -179,6 +257,18 @@ const dashboardSlice = createSlice({
         state.actionLoadingById[challengeId] = false;
         state.actionErrorById[challengeId] =
           action.payload?.message || "Failed to submit challenge action.";
+      })
+      .addCase(fetchWellnessTrends.pending, (state) => {
+        state.trendsLoading = true;
+        state.trendsError = "";
+      })
+      .addCase(fetchWellnessTrends.fulfilled, (state, action) => {
+        state.trendsLoading = false;
+        state.trends = action.payload;
+      })
+      .addCase(fetchWellnessTrends.rejected, (state, action) => {
+        state.trendsLoading = false;
+        state.trendsError = action.payload || "Failed to fetch wellness trends.";
       })
       .addCase(fetchSessionSuggestions.pending, (state) => {
         state.suggestionsLoading = true;

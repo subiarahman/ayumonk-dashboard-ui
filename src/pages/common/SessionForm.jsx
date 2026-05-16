@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -23,13 +23,19 @@ import {
 import { getUserProfile } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
 
-export default function SessionForm() {
+export default function SessionForm({
+  sessionId: sessionIdProp,
+  onContinue,
+  continueLabel = "Continue to dashboard",
+} = {}) {
   const theme = useTheme();
   const dispatch = useDispatch();
-  // const navigate = useNavigate();
-  const { id } = useParams();
+  const params = useParams();
+  // Accept sessionId either as a prop (when rendered inside OnboardingGate
+  // or other host components) or from the URL (when mounted at the public
+  // /sessions/:id/form route).
+  const id = sessionIdProp || params.id;
   const storedProfile = getUserProfile();
-  // const role = useSelector((state) => state.auth.role);
   const {
     sessionForm,
     formLoading,
@@ -275,19 +281,31 @@ export default function SessionForm() {
                 spacing={1.2}
               >
                 <Typography variant="body2" color="text.secondary">
-                  Your responses will be submitted for this session.
+                  {submittedResponseId
+                    ? "Your response has been recorded."
+                    : "Your responses will be submitted for this session."}
                 </Typography>
-                <Button
-                  variant="contained"
-                  onClick={handleSubmit}
-                  disabled={submitLoading || Boolean(submittedResponseId)}
-                >
-                  {submitLoading
-                    ? "Submitting..."
-                    : submittedResponseId
-                      ? "Submitted"
-                      : "Submit Form"}
-                </Button>
+                {submittedResponseId && onContinue ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => onContinue(submittedResponseId)}
+                  >
+                    {continueLabel}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    onClick={handleSubmit}
+                    disabled={submitLoading || Boolean(submittedResponseId)}
+                  >
+                    {submitLoading
+                      ? "Submitting..."
+                      : submittedResponseId
+                        ? "Submitted"
+                        : "Submit Form"}
+                  </Button>
+                )}
               </Stack>
             </Paper>
           </>

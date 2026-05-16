@@ -6,6 +6,11 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   MenuItem,
   Paper,
@@ -35,6 +40,8 @@ import {
 } from "../../store/questionSlice";
 import { fetchThemes } from "../../store/themeSlice";
 import { fetchKpis } from "../../store/kpiSlice";
+import { fetchCompanies } from "../../store/companySlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { downloadTemplateFile } from "../../utils/downloadTemplate";
 
@@ -51,8 +58,15 @@ export default function Questions({ role = "admin" }) {
   const location = useLocation();
   const feedback = location.state?.feedback;
   const fileInputRef = useRef(null);
+  // Spec: questions slug maps to the `kpis` resource codename (questions are
+  // a child of KPIs). The slug→resource map in usePermissions handles this.
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateQuestions = canCreate("questions");
+  const canEditQuestions = canEdit("questions");
+  const canDeleteQuestions = canDelete("questions");
   const { items: themeItems } = useSelector((state) => state.theme);
   const { items: kpiItems } = useSelector((state) => state.kpi);
+  const { companies } = useSelector((state) => state.company);
   const {
     items,
     total,
@@ -66,18 +80,23 @@ export default function Questions({ role = "admin" }) {
     uploadStatus,
   } = useSelector((state) => state.question);
   const [filters, setFilters] = useState({
+    companyId: "",
     themeKey: "",
     kpiKey: "",
     search: "",
     status: "all",
   });
   const [appliedFilters, setAppliedFilters] = useState({
+    companyId: "",
     themeKey: "",
     kpiKey: "",
     search: "",
     status: "all",
   });
   const [uploadFeedback, setUploadFeedback] = useState(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importCompanyId, setImportCompanyId] = useState("");
+  const [importFile, setImportFile] = useState(null);
 
   const isActive =
     appliedFilters.status === "all"
@@ -85,9 +104,17 @@ export default function Questions({ role = "admin" }) {
       : appliedFilters.status === "active";
 
   useEffect(() => {
-    dispatch(fetchThemes({ isActive: true }));
-    dispatch(fetchKpis({ isActive: true }));
-  }, [dispatch]);
+    if (role === "superadmin") {
+      dispatch(fetchCompanies());
+    }
+  }, [dispatch, role]);
+
+  useEffect(() => {
+    const companyId =
+      role === "superadmin" ? filters.companyId || undefined : undefined;
+    dispatch(fetchThemes({ isActive: true, companyId }));
+    dispatch(fetchKpis({ isActive: true, companyId }));
+  }, [filters.companyId, dispatch, role]);
 
   useEffect(() => {
     dispatch(
@@ -98,14 +125,18 @@ export default function Questions({ role = "admin" }) {
         kpiKey: appliedFilters.kpiKey,
         search: appliedFilters.search,
         isActive,
+        companyId:
+          role === "superadmin" ? appliedFilters.companyId || undefined : undefined,
       }),
     );
   }, [
+    appliedFilters.companyId,
     appliedFilters.kpiKey,
     appliedFilters.search,
     appliedFilters.themeKey,
     dispatch,
     isActive,
+    role,
   ]);
 
   useEffect(() => {
@@ -142,6 +173,15 @@ export default function Questions({ role = "admin" }) {
     [kpiItems],
   );
 
+  const companyNameById = useMemo(
+    () =>
+      companies.reduce((accumulator, company) => {
+        accumulator[company.id] = company.company_name;
+        return accumulator;
+      }, {}),
+    [companies],
+  );
+
   const handleDelete = useCallback(async (questionId, questionCode) => {
     if (!window.confirm(`Delete question "${questionCode}"?`)) return;
 
@@ -152,15 +192,34 @@ export default function Questions({ role = "admin" }) {
     }
   }, [dispatch]);
 
-  const handleImport = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const openImportDialog = () => {
     dispatch(resetQuestionUpload());
     setUploadFeedback(null);
+    setImportCompanyId("");
+    setImportFile(null);
+    setImportDialogOpen(true);
+  };
 
+  const closeImportDialog = () => {
+    if (uploadLoading) return;
+    setImportDialogOpen(false);
+    setImportCompanyId("");
+    setImportFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleImportFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (uploadError) dispatch(clearQuestionUploadError());
+    setImportFile(file || null);
+  };
+
+  const submitImport = async () => {
+    if (!importFile || !importCompanyId) return;
     try {
-      await dispatch(uploadQuestionFile(file)).unwrap();
+      await dispatch(
+        uploadQuestionFile({ file: importFile, companyId: importCompanyId }),
+      ).unwrap();
       await dispatch(
         fetchQuestions({
           skip: 0,
@@ -173,13 +232,15 @@ export default function Questions({ role = "admin" }) {
       ).unwrap();
       setUploadFeedback({
         severity: "success",
-        message: `Question file "${file.name}" uploaded successfully.`,
+        message: `Question file "${importFile.name}" uploaded successfully.`,
       });
+      setImportDialogOpen(false);
+      setImportCompanyId("");
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch {
-      // Redux state already stores the error.
+      // Redux state already stores the error; dialog renders uploadError inline.
     }
-
-    event.target.value = "";
   };
 
   const handleDownloadFormat = () => {
@@ -188,6 +249,7 @@ export default function Questions({ role = "admin" }) {
 
   const handleApplyFilters = () => {
     setAppliedFilters({
+      companyId: filters.companyId,
       themeKey: filters.themeKey,
       kpiKey: filters.kpiKey,
       search: filters.search,
@@ -197,6 +259,7 @@ export default function Questions({ role = "admin" }) {
 
   const handleResetFilters = () => {
     const defaultFilters = {
+      companyId: "",
       themeKey: "",
       kpiKey: "",
       search: "",
@@ -213,12 +276,24 @@ export default function Questions({ role = "admin" }) {
         kpiKey: "",
         search: "",
         isActive: undefined,
+        companyId: undefined,
       }),
     );
   };
 
   const columns = useMemo(
     () => [
+      ...(role === "superadmin"
+        ? [
+            {
+              field: "company_id",
+              headerName: "Company",
+              minWidth: 200,
+              valueGetter: (_, row) =>
+                companyNameById[row.company_id] || row.company_id || "-",
+            },
+          ]
+        : []),
       {
         field: "question_code",
         headerName: "Question Code",
@@ -296,31 +371,51 @@ export default function Questions({ role = "admin" }) {
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Edit">
-              <IconButton
-                size="small"
-                onClick={() => navigate(`/super-admin/questions/${row.id}/edit`)}
-              >
-                <EditRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Delete">
-              <span>
+            {canEditQuestions && (
+              <Tooltip title="Edit">
                 <IconButton
                   size="small"
-                  color="error"
-                  disabled={deleteLoading}
-                  onClick={() => handleDelete(row.id, row.question_code)}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? `/admin/questions/${row.id}/edit`
+                        : `/super-admin/questions/${row.id}/edit`,
+                    )
+                  }
                 >
-                  <DeleteOutlineRoundedIcon fontSize="small" />
+                  <EditRoundedIcon fontSize="small" />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            )}
+            {canDeleteQuestions && (
+              <Tooltip title="Delete">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.id, row.question_code)}
+                  >
+                    <DeleteOutlineRoundedIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDelete, kpiNameByKey, navigate, role, themeNameByKey],
+    [
+      canDeleteQuestions,
+      canEditQuestions,
+      companyNameById,
+      deleteLoading,
+      handleDelete,
+      kpiNameByKey,
+      navigate,
+      role,
+      themeNameByKey,
+    ],
   );
 
   return (
@@ -369,11 +464,17 @@ export default function Questions({ role = "admin" }) {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              {role === "superadmin" && (
+              {canCreateQuestions && (
                 <Button
                   variant="contained"
                   startIcon={<AddRoundedIcon />}
-                  onClick={() => navigate("/super-admin/questions/add")}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? "/admin/questions/add"
+                        : "/super-admin/questions/add",
+                    )
+                  }
                 >
                   Add Question
                 </Button>
@@ -386,11 +487,12 @@ export default function Questions({ role = "admin" }) {
               >
                 Download format
               </Button>
-              {role === "superadmin" && (
+              {/* Bulk upload is a create action — gate on the create codename, not just role. */}
+              {role === "superadmin" && canCreateQuestions && (
                 <Button
                   variant="outlined"
                   startIcon={<UploadFileRoundedIcon />}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={openImportDialog}
                   disabled={uploadLoading}
                   sx={{ whiteSpace: "nowrap" }}
                 >
@@ -424,12 +526,7 @@ export default function Questions({ role = "admin" }) {
             ref={fileInputRef}
             type="file"
             accept=".xlsx,.xls,.csv"
-            onChange={handleImport}
-            onClick={() => {
-              if (uploadError) {
-                dispatch(clearQuestionUploadError());
-              }
-            }}
+            onChange={handleImportFileChange}
           />
 
           <Box
@@ -440,11 +537,38 @@ export default function Questions({ role = "admin" }) {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, minmax(0, 1fr))",
-                lg: "repeat(4, minmax(0, 1fr)) auto auto",
+                lg:
+                  role === "superadmin"
+                    ? "repeat(5, minmax(0, 1fr)) auto auto"
+                    : "repeat(4, minmax(0, 1fr))",
               },
               alignItems: { lg: "end" },
             }}
           >
+            {role === "superadmin" && (
+              <TextField
+                label="Company"
+                select
+                value={filters.companyId}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    companyId: event.target.value,
+                    themeKey: "",
+                    kpiKey: "",
+                  }))
+                }
+                fullWidth
+                sx={filterFieldSx}
+              >
+                <MenuItem value="">All Companies</MenuItem>
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.company_name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField
               label="Theme"
               select
@@ -566,6 +690,68 @@ export default function Questions({ role = "admin" }) {
           </Box>
         </Paper>
       </Stack>
+
+      <Dialog
+        open={importDialogOpen}
+        onClose={closeImportDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Import Questions</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {uploadError && <Alert severity="error">{uploadError}</Alert>}
+            <TextField
+              label="Company"
+              select
+              value={importCompanyId}
+              onChange={(event) => setImportCompanyId(event.target.value)}
+              required
+              fullWidth
+            >
+              <MenuItem value="">Select company</MenuItem>
+              {companies.map((company) => (
+                <MenuItem key={company.id} value={company.id}>
+                  {company.company_name}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="outlined"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadLoading}
+              >
+                Browse...
+              </Button>
+              <Typography
+                variant="body2"
+                color={importFile ? "text.primary" : "text.secondary"}
+                sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {importFile ? importFile.name : "No file selected"}
+              </Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Accepted formats: .xlsx, .xls, .csv
+            </Typography>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeImportDialog} disabled={uploadLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={submitImport}
+            disabled={uploadLoading || !importFile || !importCompanyId}
+            startIcon={uploadLoading ? <CircularProgress size={16} /> : null}
+          >
+            {uploadLoading ? "Uploading..." : "Upload"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 }

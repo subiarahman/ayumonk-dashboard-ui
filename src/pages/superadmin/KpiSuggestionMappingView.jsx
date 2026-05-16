@@ -22,6 +22,7 @@ import {
 } from "../../store/kpiSuggestionMappingSlice";
 import { fetchQuestions } from "../../store/questionSlice";
 import { fetchThemes } from "../../store/themeSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -37,6 +38,8 @@ export default function KpiSuggestionMappingView() {
   const { selectedMapping, detailLoading, detailError } = useSelector(
     (state) => state.kpiSuggestionMapping,
   );
+  const { canEdit } = usePermissions();
+  const canEditMappings = canEdit("kpi-suggestion-mapping");
 
   useEffect(() => {
     dispatch(fetchThemes({ limit: 500, isActive: true }));
@@ -151,13 +154,17 @@ export default function KpiSuggestionMappingView() {
             >
               Back to list
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/super-admin/kpi-suggestion-mapping/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {canEditMappings && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() =>
+                  navigate(`/super-admin/kpi-suggestion-mapping/${id}/edit`)
+                }
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 

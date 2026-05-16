@@ -32,6 +32,7 @@ import {
 } from "../../store/questionSlice";
 import { getSurfaceBackground } from "../../theme";
 import { getCompanyId } from "../../utils/roleHelper";
+import usePermissions from "../../hooks/usePermissions";
 
 const createEmptyOption = (index) => ({
   option_number: index + 1,
@@ -68,6 +69,8 @@ export default function QuestionWorkflowForm({ mode, role = "admin" }) {
   } = useSelector((state) => state.question);
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState("");
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("questions") : canCreate("questions");
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -484,18 +487,20 @@ export default function QuestionWorkflowForm({ mode, role = "admin" }) {
       </Stack>
 
       <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-        <Button
-          variant="contained"
-          startIcon={<SaveRoundedIcon />}
-          onClick={handleSave}
-          disabled={createLoading || updateLoading}
-        >
-          {createLoading || updateLoading
-            ? "Saving..."
-            : mode === "edit"
-              ? "Update Question"
-              : "Create Question"}
-        </Button>
+        {canSubmitForm && (
+          <Button
+            variant="contained"
+            startIcon={<SaveRoundedIcon />}
+            onClick={handleSave}
+            disabled={createLoading || updateLoading}
+          >
+            {createLoading || updateLoading
+              ? "Saving..."
+              : mode === "edit"
+                ? "Update Question"
+                : "Create Question"}
+          </Button>
+        )}
         <Button variant="outlined" onClick={() => navigate("/admin/questions")}>
           Cancel
         </Button>

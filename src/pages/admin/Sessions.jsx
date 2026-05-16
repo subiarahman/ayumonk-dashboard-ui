@@ -42,11 +42,16 @@ import { getSurfaceBackground } from "../../theme";
 import { alpha } from "@mui/material/styles";
 import { formatDateTimeIST } from "../../utils/dateTime";
 import { getCompanyId } from "../../utils/roleHelper";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function Sessions({ role = "admin" }) {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateSessions = canCreate("sessions");
+  const canEditSessions = canEdit("sessions");
+  const canDeleteSessions = canDelete("sessions");
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     companyId: role === "admin" ? getCompanyId() : "",
@@ -260,37 +265,49 @@ export default function Sessions({ role = "admin" }) {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Edit Session">
-              <IconButton
-                size="small"
-                color="info"
-                onClick={() =>
-                  navigate(
-                    role === "admin"
-                      ? `/admin/sessions/${params.row.id}/edit`
-                      : `/super-admin/sessions/${params.row.id}/edit`,
-                  )
-                }
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {canEditSessions && (
+              <Tooltip title="Edit Session">
+                <IconButton
+                  size="small"
+                  color="info"
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? `/admin/sessions/${params.row.id}/edit`
+                        : `/super-admin/sessions/${params.row.id}/edit`,
+                    )
+                  }
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
 
-            <Tooltip title="Delete">
-              <IconButton
-                size="small"
-                color="error"
-                onClick={() => handleDeleteSession(params.row)}
-                disabled={deleteLoading}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            {canDeleteSessions && (
+              <Tooltip title="Delete">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => handleDeleteSession(params.row)}
+                  disabled={deleteLoading}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDeleteSession, handlePreviewSession, navigate, role],
+    [
+      canDeleteSessions,
+      canEditSessions,
+      deleteLoading,
+      handleDeleteSession,
+      handlePreviewSession,
+      navigate,
+      role,
+    ],
   );
 
   return (
@@ -321,10 +338,16 @@ export default function Sessions({ role = "admin" }) {
               </Typography>
             </Box>
             <Stack direction="row" spacing={1}>
-              {role === "superadmin" && (
+              {canCreateSessions && (
                 <Button
                   variant="contained"
-                  onClick={() => navigate("/super-admin/sessions/add")}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? "/admin/sessions/add"
+                        : "/super-admin/sessions/add",
+                    )
+                  }
                 >
                   Add Session
                 </Button>

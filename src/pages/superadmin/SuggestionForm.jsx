@@ -26,6 +26,7 @@ import {
   updateAdminSuggestion,
 } from "../../store/adminSuggestionSlice";
 import { getSurfaceBackground } from "../../theme";
+import usePermissions from "../../hooks/usePermissions";
 
 const suggestionTypeOptions = ["aahar", "vihar", "aushadh"];
 const doshaOptions = ["all", "vata", "pitta", "kapha"];
@@ -102,6 +103,8 @@ export default function SuggestionForm({ mode }) {
 
   const isEdit = mode === "edit";
   const isSubmitting = createLoading || updateLoading;
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = isEdit ? canEdit("suggestion-master") : canCreate("suggestion-master");
   const pageTitle = useMemo(
     () => (isEdit ? "Edit Suggestion" : "Add Suggestion"),
     [isEdit],
@@ -323,14 +326,16 @@ export default function SuggestionForm({ mode }) {
           />
 
           <Stack direction="row" spacing={1.5}>
-            <Button
-              variant="contained"
-              startIcon={<SaveRoundedIcon />}
-              onClick={handleSave}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Create Suggestion"}
-            </Button>
+            {canSubmitForm && (
+              <Button
+                variant="contained"
+                startIcon={<SaveRoundedIcon />}
+                onClick={handleSave}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Saving..." : isEdit ? "Save Changes" : "Create Suggestion"}
+              </Button>
+            )}
             <Button
               variant="outlined"
               onClick={() => navigate("/super-admin/suggestion-master")}

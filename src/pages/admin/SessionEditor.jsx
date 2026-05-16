@@ -26,6 +26,7 @@ import {
 } from "../../store/sessionSlice";
 import { getSurfaceBackground } from "../../theme";
 import { getCompanyId } from "../../utils/roleHelper";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function SessionEditor({ mode, role = "superadmin" }) {
   const dispatch = useDispatch();
@@ -51,6 +52,8 @@ export default function SessionEditor({ mode, role = "superadmin" }) {
   const [companyId, setCompanyId] = useState("");
   const [formError, setFormError] = useState("");
   const fallbackCompanyId = getCompanyId();
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("sessions") : canCreate("sessions");
 
   useEffect(() => {
     if (mode === "add") {
@@ -218,26 +221,28 @@ export default function SessionEditor({ mode, role = "superadmin" }) {
           </TextField>
 
           <Stack direction="row" spacing={1.2} flexWrap="wrap" useFlexGap>
-            <Button
-              variant="contained"
-              onClick={handleSubmit}
-              disabled={
-                createLoading ||
-                updateLoading ||
-                detailLoading ||
-                (mode === "add" && Boolean(createdSession?.id))
-              }
-            >
-              {createLoading || updateLoading
-                ? mode === "edit"
-                  ? "Saving..."
-                  : "Creating..."
-                : mode === "edit"
-                  ? "Save Session"
-                  : createdSession?.id
-                    ? "Session Created"
-                    : "Create Session"}
-            </Button>
+            {canSubmitForm && (
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={
+                  createLoading ||
+                  updateLoading ||
+                  detailLoading ||
+                  (mode === "add" && Boolean(createdSession?.id))
+                }
+              >
+                {createLoading || updateLoading
+                  ? mode === "edit"
+                    ? "Saving..."
+                    : "Creating..."
+                  : mode === "edit"
+                    ? "Save Session"
+                    : createdSession?.id
+                      ? "Session Created"
+                      : "Create Session"}
+              </Button>
+            )}
             <Button
               variant="outlined"
               onClick={() => navigate("/super-admin/sessions")}

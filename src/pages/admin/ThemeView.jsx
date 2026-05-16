@@ -18,6 +18,7 @@ import {
   clearThemeDetailState,
   fetchThemeById,
 } from "../../store/themeSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -29,6 +30,8 @@ export default function ThemeView({ role = "admin" }) {
   const { selectedTheme, detailLoading, detailError } = useSelector(
     (state) => state.theme,
   );
+  const { canEdit } = usePermissions();
+  const canEditThemes = canEdit("themes");
 
   useEffect(() => {
     if (id) {
@@ -74,11 +77,17 @@ export default function ThemeView({ role = "admin" }) {
             <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(backPath)}>
               Back to list
             </Button>
-            {role === "superadmin" && (
+            {canEditThemes && (
               <Button
                 variant="contained"
                 startIcon={<EditRoundedIcon />}
-                onClick={() => navigate(`/super-admin/themes/${id}/edit`)}
+                onClick={() =>
+                  navigate(
+                    role === "admin"
+                      ? `/admin/themes/${id}/edit`
+                      : `/super-admin/themes/${id}/edit`,
+                  )
+                }
               >
                 Edit
               </Button>

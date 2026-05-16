@@ -39,12 +39,15 @@ const normalizeUser = (item, index = 0) => ({
   emp_id: item?.emp_id || item?.employee_id || "",
   full_name: item?.full_name || "",
   department: item?.department || "",
-  location: item?.location || "",
+  department_id:
+    item?.department_id != null ? String(item.department_id) : "",
   gender: item?.gender || "",
   age_band: item?.age_band || "",
   phone: String(item?.phone ?? ""),
   email: item?.email || "",
   company_id: item?.company_id || "",
+  role_id: item?.role_id != null ? String(item.role_id) : "",
+  role_name: item?.role_name || item?.role || "",
   is_active: Boolean(item?.is_active),
   created_at: item?.created_at || "",
   updated_at: item?.updated_at || "",
@@ -52,13 +55,30 @@ const normalizeUser = (item, index = 0) => ({
 
 export const fetchUsers = createAsyncThunk(
   "user/fetchUsers",
-  async ({ companyId, search = "", isActive } = {}, { rejectWithValue }) => {
+  async (
+    {
+      companyId,
+      departmentId,
+      roleId,
+      search = "",
+      isActive,
+      skip,
+      limit,
+    } = {},
+    { rejectWithValue },
+  ) => {
     try {
       const response = await api.get(API_URLS.users, {
         params: {
           ...(companyId ? { company_id: companyId } : {}),
+          ...(departmentId ? { department_id: departmentId } : {}),
+          ...(roleId !== undefined && roleId !== null && roleId !== ""
+            ? { role_id: roleId }
+            : {}),
           ...(search ? { search } : {}),
           ...(typeof isActive === "boolean" ? { is_active: isActive } : {}),
+          ...(typeof skip === "number" ? { skip } : {}),
+          ...(typeof limit === "number" ? { limit } : {}),
         },
       });
       const payload = response?.data || {};

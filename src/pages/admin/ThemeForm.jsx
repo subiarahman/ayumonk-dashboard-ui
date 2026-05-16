@@ -28,6 +28,7 @@ import {
 import { fetchCompanies } from "../../store/companySlice";
 import { getCompanyId } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
+import usePermissions from "../../hooks/usePermissions";
 
 export default function ThemeForm({ mode, role = "superadmin" }) {
   const theme = useTheme();
@@ -44,6 +45,8 @@ export default function ThemeForm({ mode, role = "superadmin" }) {
   const [companyId, setCompanyId] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [formError, setFormError] = useState("");
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("themes") : canCreate("themes");
 
   useEffect(() => {
     dispatch(fetchCompanies());
@@ -186,9 +189,11 @@ export default function ThemeForm({ mode, role = "superadmin" }) {
         </Stack>
 
         <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-          <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} disabled={createLoading || updateLoading}>
-            {createLoading || updateLoading ? "Saving..." : "Save"}
-          </Button>
+          {canSubmitForm && (
+            <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={handleSave} disabled={createLoading || updateLoading}>
+              {createLoading || updateLoading ? "Saving..." : "Save"}
+            </Button>
+          )}
           <Button variant="outlined" onClick={() => navigate(role === "admin" ? "/admin/themes" : "/super-admin/themes")}>Cancel</Button>
         </Stack>
       </Paper>

@@ -24,21 +24,30 @@ import {
   updateUser,
 } from "../../store/userSlice";
 import { fetchCompanies } from "../../store/companySlice";
+import {
+  clearRoleListState,
+  fetchRolesByTenant,
+} from "../../store/roleSlice";
+import {
+  fetchDepartments,
+  resetDepartments,
+} from "../../store/departmentSlice";
 import api, { getApiErrorMessage } from "../../services/api";
 import { API_URLS } from "../../services/apiUrls";
 import { getCompanyId, setCompanyId } from "../../utils/roleHelper";
 import { getSurfaceBackground } from "../../theme";
+import usePermissions from "../../hooks/usePermissions";
 
 const emptyForm = {
   emp_id: "",
   full_name: "",
   department: "",
-  location: "",
   gender: "",
   age_band: "",
   phone: "",
   email: "",
   company_id: "",
+  role_id: "",
 };
 
 export default function CompanyUsersForm({ mode, role = "admin" }) {
@@ -56,10 +65,22 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
     updateError,
   } = useSelector((state) => state.user);
   const { companies } = useSelector((state) => state.company);
+  const {
+    items: roleItems,
+    listLoading: rolesLoading,
+    listError: rolesError,
+  } = useSelector((state) => state.role);
+  const {
+    items: departmentItems,
+    listLoading: departmentsLoading,
+    listError: departmentsError,
+  } = useSelector((state) => state.department);
   const [form, setForm] = useState(mode === "edit" ? {} : emptyForm);
   const [formError, setFormError] = useState("");
   const [companyMe, setCompanyMe] = useState(null);
   const [companyMeError, setCompanyMeError] = useState("");
+  const { canCreate, canEdit } = usePermissions();
+  const canSubmitForm = mode === "edit" ? canEdit("company-users") : canCreate("company-users");
 
   const pageTitle = useMemo(
     () => (mode === "edit" ? "Edit User" : "Add User"),
@@ -99,6 +120,8 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
       dispatch(clearUserCreateState());
       dispatch(clearUserUpdateState());
       dispatch(clearUserDetailState());
+      dispatch(clearRoleListState());
+      dispatch(resetDepartments());
     };
   }, [dispatch, id, mode, role]);
 
@@ -116,28 +139,51 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
             emp_id: selectedUser?.emp_id || "",
             full_name: selectedUser?.full_name || "",
             department: selectedUser?.department || "",
-            location: selectedUser?.location || "",
             gender: selectedUser?.gender || "",
             age_band: selectedUser?.age_band || "",
             phone: selectedUser?.phone || "",
             email: selectedUser?.email || "",
             company_id: selectedUser?.company_id || "",
+            role_id:
+              selectedUser?.role_id != null
+                ? String(selectedUser.role_id)
+                : "",
           }
         : emptyForm;
+
+    // Only surface a role_id when the matching role is loaded into the
+    // dropdown options; otherwise Select would render an empty value
+    // because no <MenuItem> matches yet.
+    const draftRoleId =
+      form.role_id !== undefined && form.role_id !== null
+        ? form.role_id
+        : base.role_id;
+    const resolvedRoleId =
+      draftRoleId &&
+      roleItems.some((item) => String(item.id) === String(draftRoleId))
+        ? String(draftRoleId)
+        : "";
 
     return {
       ...base,
       ...form,
       company_id: role === "admin" ? selectedCompanyId : form.company_id || base.company_id,
+      role_id: resolvedRoleId,
     };
-  }, [form, mode, role, selectedCompanyId, selectedUser]);
+  }, [form, mode, role, roleItems, selectedCompanyId, selectedUser]);
+
+  useEffect(() => {
+    if (resolvedForm.company_id) {
+      dispatch(fetchRolesByTenant(resolvedForm.company_id));
+      dispatch(fetchDepartments(resolvedForm.company_id));
+    }
+  }, [dispatch, resolvedForm.company_id]);
 
   const validate = () => {
     if (
       !resolvedForm.emp_id.trim() ||
       !resolvedForm.full_name.trim() ||
       !resolvedForm.department.trim() ||
-      !resolvedForm.location.trim() ||
       !resolvedForm.gender.trim() ||
       !resolvedForm.phone.trim() ||
       !resolvedForm.email.trim()
@@ -147,6 +193,10 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
 
     if (!resolvedForm.company_id) {
       return "Select a company for this user.";
+    }
+
+    if (!resolvedForm.role_id) {
+      return "Select a role for this user.";
     }
 
     return "";
@@ -161,16 +211,22 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
 
     setFormError("");
 
+    const departmentName = resolvedForm.department.trim();
+    const selectedDepartment = departmentItems.find(
+      (item) => item.name === departmentName,
+    );
+
     const payload = {
       emp_id: resolvedForm.emp_id.trim(),
       full_name: resolvedForm.full_name.trim(),
-      department: resolvedForm.department.trim(),
-      location: resolvedForm.location.trim(),
+      department: departmentName,
+      ...(selectedDepartment ? { department_id: selectedDepartment.id } : {}),
       gender: resolvedForm.gender.trim(),
       age_band: resolvedForm.age_band,
       phone: resolvedForm.phone.trim(),
       email: resolvedForm.email.trim(),
       company_id: resolvedForm.company_id,
+      role_id: Number(resolvedForm.role_id),
     };
 
     try {
@@ -267,6 +323,35 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
             gap: 2,
           }}
         >
+          {role === "superadmin" ? (
+            <TextField
+              label="Company"
+              value={resolvedForm.company_id}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  company_id: event.target.value,
+                  role_id: "",
+                }))
+              }
+              select
+              fullWidth
+            >
+              <MenuItem value="">Select Company</MenuItem>
+              {companies.map((company) => (
+                <MenuItem key={company.id} value={company.id}>
+                  {company.company_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              label="Company"
+              value={companyMe?.company_name || ""}
+              fullWidth
+              disabled
+            />
+          )}
           <TextField
             label="Employee ID"
             value={resolvedForm.emp_id}
@@ -289,16 +374,29 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
             onChange={(event) =>
               setForm((current) => ({ ...current, department: event.target.value }))
             }
+            select
             fullWidth
-          />
-          <TextField
-            label="Location"
-            value={resolvedForm.location}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, location: event.target.value }))
+            disabled={!resolvedForm.company_id || departmentsLoading}
+            error={Boolean(departmentsError)}
+            helperText={
+              !resolvedForm.company_id
+                ? "Select a company first"
+                : departmentsLoading
+                  ? "Loading departments..."
+                  : departmentsError
+                    ? departmentsError
+                    : departmentItems.length === 0
+                      ? "No departments available for this company"
+                      : ""
             }
-            fullWidth
-          />
+          >
+            <MenuItem value="">Select Department</MenuItem>
+            {departmentItems.map((department) => (
+              <MenuItem key={department.id} value={department.name}>
+                {department.name}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             label="Gender"
             value={resolvedForm.gender}
@@ -347,46 +445,52 @@ export default function CompanyUsersForm({ mode, role = "admin" }) {
             }
             fullWidth
           />
-          {role === "superadmin" ? (
-            <TextField
-              label="Company"
-              value={resolvedForm.company_id}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, company_id: event.target.value }))
-              }
-              select
-              fullWidth
-            >
-              <MenuItem value="">Select Company</MenuItem>
-              {companies.map((company) => (
-                <MenuItem key={company.id} value={company.id}>
-                  {company.company_name}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : (
-            <TextField
-              label="Company"
-              value={companyMe?.company_name || ""}
-              fullWidth
-              disabled
-            />
-          )}
+          <TextField
+            label="Role"
+            value={resolvedForm.role_id || ""}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, role_id: event.target.value }))
+            }
+            select
+            fullWidth
+            disabled={!resolvedForm.company_id || rolesLoading}
+            error={Boolean(rolesError)}
+            helperText={
+              !resolvedForm.company_id
+                ? "Select a company first"
+                : rolesLoading
+                  ? "Loading roles..."
+                  : rolesError
+                    ? rolesError
+                    : roleItems.length === 0
+                      ? "No roles available for this company"
+                      : ""
+            }
+          >
+            <MenuItem value="">Select Role</MenuItem>
+            {roleItems.map((roleOption) => (
+              <MenuItem key={roleOption.id} value={roleOption.id}>
+                {roleOption.name}
+              </MenuItem>
+            ))}
+          </TextField>
         </Box>
 
         <Stack direction="row" spacing={1.25} sx={{ mt: 3 }}>
-          <Button
-            variant="contained"
-            startIcon={<SaveRoundedIcon />}
-            onClick={handleSave}
-            disabled={createLoading || updateLoading}
-          >
-            {createLoading || updateLoading
-              ? "Saving..."
-              : mode === "edit"
-                ? "Update User"
-                : "Create User"}
-          </Button>
+          {canSubmitForm && (
+            <Button
+              variant="contained"
+              startIcon={<SaveRoundedIcon />}
+              onClick={handleSave}
+              disabled={createLoading || updateLoading}
+            >
+              {createLoading || updateLoading
+                ? "Saving..."
+                : mode === "edit"
+                  ? "Update User"
+                  : "Create User"}
+            </Button>
+          )}
           <Button
             variant="outlined"
             onClick={() =>

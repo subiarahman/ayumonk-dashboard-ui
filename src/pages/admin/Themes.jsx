@@ -28,6 +28,8 @@ import {
   deleteTheme,
   fetchThemes,
 } from "../../store/themeSlice";
+import { fetchCompanies } from "../../store/companySlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -52,11 +54,18 @@ export default function Themes({ role = "admin" }) {
     deleteError,
     deleteMessage,
   } = useSelector((state) => state.theme);
+  const { companies } = useSelector((state) => state.company);
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateThemes = canCreate("themes");
+  const canEditThemes = canEdit("themes");
+  const canDeleteThemes = canDelete("themes");
   const [filters, setFilters] = useState({
+    companyId: "",
     search: "",
     status: "all",
   });
   const [appliedFilters, setAppliedFilters] = useState({
+    companyId: "",
     search: "",
     status: "all",
   });
@@ -66,14 +75,33 @@ export default function Themes({ role = "admin" }) {
       ? undefined
       : appliedFilters.status === "active";
 
+  const companyIdParam =
+    role === "superadmin" ? appliedFilters.companyId || undefined : undefined;
+
+  useEffect(() => {
+    if (role === "superadmin") {
+      dispatch(fetchCompanies());
+    }
+  }, [dispatch, role]);
+
   useEffect(() => {
     dispatch(
       fetchThemes({
         search: appliedFilters.search.trim(),
         isActive: role === "admin" ? true : isActive,
+        companyId: companyIdParam,
       }),
     );
-  }, [appliedFilters.search, dispatch, isActive, role]);
+  }, [appliedFilters.search, companyIdParam, dispatch, isActive, role]);
+
+  const companyNameById = useMemo(
+    () =>
+      companies.reduce((accumulator, company) => {
+        accumulator[company.id] = company.company_name;
+        return accumulator;
+      }, {}),
+    [companies],
+  );
 
   useEffect(() => {
     return () => {
@@ -87,27 +115,29 @@ export default function Themes({ role = "admin" }) {
       fetchThemes({
         search: appliedFilters.search.trim(),
         isActive: role === "admin" ? true : isActive,
+        companyId: companyIdParam,
       }),
     );
   };
 
   const handleDelete = useCallback(async (themeKey) => {
     try {
-      if (role !== "superadmin") return;
       await dispatch(deleteTheme(themeKey)).unwrap();
       dispatch(
         fetchThemes({
           search: appliedFilters.search.trim(),
           isActive: role === "admin" ? true : isActive,
+          companyId: companyIdParam,
         }),
       );
     } catch {
       // Error is already handled in redux state.
     }
-  }, [appliedFilters.search, dispatch, isActive]);
+  }, [appliedFilters.search, companyIdParam, dispatch, isActive, role]);
 
   const handleApplyFilters = () => {
     setAppliedFilters({
+      companyId: filters.companyId,
       search: filters.search,
       status: filters.status,
     });
@@ -115,6 +145,7 @@ export default function Themes({ role = "admin" }) {
 
   const handleResetFilters = () => {
     const defaultFilters = {
+      companyId: "",
       search: "",
       status: "all",
     };
@@ -125,12 +156,25 @@ export default function Themes({ role = "admin" }) {
       fetchThemes({
         search: "",
         isActive: role === "admin" ? true : undefined,
+        companyId: undefined,
       }),
     );
   };
 
   const columns = useMemo(
     () => [
+      ...(role === "superadmin"
+        ? [
+            {
+              field: "company_id",
+              headerName: "Company",
+              flex: 1.1,
+              minWidth: 200,
+              valueGetter: (_, row) =>
+                companyNameById[row.company_id] || row.company_id || "-",
+            },
+          ]
+        : []),
       {
         field: "theme_display_name",
         headerName: "Theme Name",
@@ -203,37 +247,49 @@ export default function Themes({ role = "admin" }) {
                 <PreviewRoundedIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            {role === "superadmin" && (
-              <>
-                <Tooltip title="Edit">
+            {canEditThemes && (
+              <Tooltip title="Edit">
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? `/admin/themes/${row.theme_key}/edit`
+                        : `/super-admin/themes/${row.theme_key}/edit`,
+                    )
+                  }
+                >
+                  <EditRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {canDeleteThemes && (
+              <Tooltip title="Delete">
+                <span>
                   <IconButton
                     size="small"
-                    onClick={() =>
-                      navigate(`/super-admin/themes/${row.theme_key}/edit`)
-                    }
+                    color="error"
+                    disabled={deleteLoading}
+                    onClick={() => handleDelete(row.theme_key)}
                   >
-                    <EditRoundedIcon fontSize="small" />
+                    <DeleteOutlineRoundedIcon fontSize="small" />
                   </IconButton>
-                </Tooltip>
-                <Tooltip title="Delete">
-                  <span>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      disabled={deleteLoading}
-                      onClick={() => handleDelete(row.theme_key)}
-                    >
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              </>
+                </span>
+              </Tooltip>
             )}
           </Stack>
         ),
       },
     ],
-    [deleteLoading, handleDelete, navigate, role],
+    [
+      canDeleteThemes,
+      canEditThemes,
+      companyNameById,
+      deleteLoading,
+      handleDelete,
+      navigate,
+      role,
+    ],
   );
 
   return (
@@ -270,11 +326,17 @@ export default function Themes({ role = "admin" }) {
             </Box>
 
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              {role === "superadmin" && (
+              {canCreateThemes && (
                 <Button
                   variant="contained"
                   startIcon={<AddRoundedIcon />}
-                  onClick={() => navigate("/super-admin/themes/add")}
+                  onClick={() =>
+                    navigate(
+                      role === "admin"
+                        ? "/admin/themes/add"
+                        : "/super-admin/themes/add",
+                    )
+                  }
                 >
                   Add Theme
                 </Button>
@@ -298,11 +360,36 @@ export default function Themes({ role = "admin" }) {
               gridTemplateColumns: {
                 xs: "1fr",
                 sm: "repeat(2, minmax(0, 1fr))",
-                lg: "repeat(4, minmax(0, 1fr)) auto auto",
+                lg:
+                  role === "superadmin"
+                    ? "repeat(3, minmax(0, 1fr)) auto auto"
+                    : "repeat(2, minmax(0, 1fr))",
               },
               alignItems: { lg: "end" },
             }}
           >
+            {role === "superadmin" && (
+              <TextField
+                label="Company"
+                select
+                value={filters.companyId}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    companyId: event.target.value,
+                  }))
+                }
+                fullWidth
+                sx={filterFieldSx}
+              >
+                <MenuItem value="">All Companies</MenuItem>
+                {companies.map((company) => (
+                  <MenuItem key={company.id} value={company.id}>
+                    {company.company_name}
+                  </MenuItem>
+                ))}
+              </TextField>
+            )}
             <TextField
               label="Search Theme"
               value={filters.search}

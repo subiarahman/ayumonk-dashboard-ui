@@ -32,6 +32,7 @@ import {
   deleteAdminSuggestion,
   fetchAdminSuggestions,
 } from "../../store/adminSuggestionSlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getRaisedGradient, getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -116,8 +117,13 @@ export default function SuggestionMaster() {
   const navigate = useNavigate();
   const location = useLocation();
   const feedback = location.state?.feedback;
-  const { items, total, listLoading, listError, deleteLoading, deleteError, deleteMessage } =
+  const { items, listLoading, listError, deleteLoading, deleteError, deleteMessage } =
     useSelector((state) => state.adminSuggestion);
+  // "suggestion-master" slug → "suggestion" resource (per audit's resource map).
+  const { canCreate, canEdit, canDelete } = usePermissions();
+  const canCreateSuggestions = canCreate("suggestion-master");
+  const canEditSuggestions = canEdit("suggestion-master");
+  const canDeleteSuggestions = canDelete("suggestion-master");
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -397,34 +403,45 @@ export default function SuggestionMaster() {
                   <PreviewRoundedIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Edit">
-                <IconButton
-                  size="small"
-                  onClick={() =>
-                    navigate(`/super-admin/suggestion-master/${row.id}/edit`)
-                  }
-                >
-                  <EditRoundedIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Delete">
-                <span>
+              {canEditSuggestions && (
+                <Tooltip title="Edit">
                   <IconButton
                     size="small"
-                    color="error"
-                    disabled={deleteLoading}
-                    onClick={() => handleDelete(row.id, row.title)}
+                    onClick={() =>
+                      navigate(`/super-admin/suggestion-master/${row.id}/edit`)
+                    }
                   >
-                    <DeleteOutlineRoundedIcon fontSize="small" />
+                    <EditRoundedIcon fontSize="small" />
                   </IconButton>
-                </span>
-              </Tooltip>
+                </Tooltip>
+              )}
+              {canDeleteSuggestions && (
+                <Tooltip title="Delete">
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={deleteLoading}
+                      onClick={() => handleDelete(row.id, row.title)}
+                    >
+                      <DeleteOutlineRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
             </Stack>
           </Box>
         ),
       },
     ],
-    [deleteLoading, navigate, theme.palette.primary.main],
+    [
+      canDeleteSuggestions,
+      canEditSuggestions,
+      deleteLoading,
+      handleDelete,
+      navigate,
+      theme.palette.primary.main,
+    ],
   );
 
   return (
@@ -452,13 +469,15 @@ export default function SuggestionMaster() {
                   </Typography>
                 </Box>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  <Button
-                    variant="contained"
-                    startIcon={<AddRoundedIcon />}
-                    onClick={() => navigate("/super-admin/suggestion-master/add")}
-                  >
-                    Add Suggestion
-                  </Button>
+                  {canCreateSuggestions && (
+                    <Button
+                      variant="contained"
+                      startIcon={<AddRoundedIcon />}
+                      onClick={() => navigate("/super-admin/suggestion-master/add")}
+                    >
+                      Add Suggestion
+                    </Button>
+                  )}
                   <Button
                     variant="outlined"
                     startIcon={<RefreshRoundedIcon />}

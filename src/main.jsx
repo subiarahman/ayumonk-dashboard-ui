@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { CssBaseline, ThemeProvider } from "@mui/material";
 import { Provider } from "react-redux";
 import App from "./App";
+import PWAUpdatePrompt from "./components/PWAUpdatePrompt";
 import { ThemeModeContext } from "./context/ThemeModeContext";
 import "./index.css";
 import { createAppTheme, getStoredThemeMode, THEME_MODE_KEY } from "./theme";
@@ -33,6 +34,7 @@ function Root() {
           <CssBaseline />
           <BrowserRouter>
             <App />
+            <PWAUpdatePrompt />
           </BrowserRouter>
         </ThemeProvider>
       </ThemeModeContext.Provider>

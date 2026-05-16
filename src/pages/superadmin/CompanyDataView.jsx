@@ -27,6 +27,7 @@ import {
   clearCompanyDetailState,
   fetchCompanyById,
 } from "../../store/companySlice";
+import usePermissions from "../../hooks/usePermissions";
 import { getSurfaceBackground } from "../../theme";
 import { formatDateTimeIST } from "../../utils/dateTime";
 
@@ -60,6 +61,8 @@ export default function CompanyDataView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [adminForm, setAdminForm] = useState(emptyAdminForm);
   const currentAdmin = selectedCompany?.admin || assignedAdmin;
+  const { canEdit } = usePermissions();
+  const canEditCompanies = canEdit("company-data");
 
   useEffect(() => {
     dispatch(fetchCompanyById(id));
@@ -147,23 +150,15 @@ export default function CompanyDataView() {
             >
               Back to list
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<PersonAddAltRoundedIcon />}
-              onClick={() => {
-                dispatch(clearAssignedAdminState());
-                setDialogOpen(true);
-              }}
-            >
-              {currentAdmin ? "Replace Admin" : "Assign Admin"}
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<EditRoundedIcon />}
-              onClick={() => navigate(`/super-admin/company-data/${id}/edit`)}
-            >
-              Edit
-            </Button>
+            {canEditCompanies && (
+              <Button
+                variant="contained"
+                startIcon={<EditRoundedIcon />}
+                onClick={() => navigate(`/super-admin/company-data/${id}/edit`)}
+              >
+                Edit
+              </Button>
+            )}
           </Stack>
         </Stack>
 
@@ -209,41 +204,6 @@ export default function CompanyDataView() {
             ))}
           </Box>
         ) : null}
-
-        <Paper variant="outlined" sx={{ mt: 3, p: 2, borderRadius: 2.5 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1.5 }}>
-            Company Admin
-          </Typography>
-          {currentAdmin ? (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
-                gap: 2,
-              }}
-            >
-              {[
-                ["Full Name", currentAdmin.full_name],
-                ["Email", currentAdmin.email],
-                ["Employee ID", currentAdmin.emp_id],
-                ["Department", currentAdmin.department],
-                ["Location", currentAdmin.location],
-                ["Gender", currentAdmin.gender],
-                ["Phone", currentAdmin.phone],
-                ["Status", currentAdmin.is_active ? "Active" : "Inactive"],
-              ].map(([label, value]) => (
-                <Paper key={label} variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    {label}
-                  </Typography>
-                  <Typography sx={{ mt: 0.8, fontWeight: 600 }}>{value || "-"}</Typography>
-                </Paper>
-              ))}
-            </Box>
-          ) : (
-            <Alert severity="info">No admin has been added for this company yet.</Alert>
-          )}
-        </Paper>
 
         {assignedAdmin && (
           <Paper variant="outlined" sx={{ mt: 3, p: 2, borderRadius: 2.5 }}>
