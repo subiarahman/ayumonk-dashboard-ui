@@ -28,6 +28,7 @@ import Badges from "../pages/admin/Badges";
 import BadgeForm from "../pages/admin/BadgeForm";
 import BadgeView from "../pages/admin/BadgeView";
 import Login from "../pages/auth/Login";
+import Landing from "../pages/Landing";
 import Profile from "../pages/common/Profile";
 import SessionForm from "../pages/common/SessionForm";
 import SketchLab from "../pages/hidden/SketchLab";
@@ -117,7 +118,7 @@ export default function AppRoutes() {
     <Routes>
       <Route
         path="/"
-        element={<Navigate to={authenticated ? fallback : "/login"} replace />}
+        element={authenticated ? <Navigate to={fallback} replace /> : <Landing />}
       />
       <Route path="/login" element={<LoginRoute fallback={fallback} />} />
 
