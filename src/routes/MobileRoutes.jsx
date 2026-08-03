@@ -6,6 +6,7 @@ import AdminApp from "../pages/mobile/admin/AdminApp";
 import HrApp from "../pages/mobile/hr/HrApp";
 import SuperAdminApp from "../pages/mobile/superadmin/SuperAdminApp";
 import Login from "../pages/auth/Login";
+import Landing from "../pages/Landing";
 import AccessDenied from "../pages/common/AccessDenied";
 import AppRoutes from "./AppRoutes";
 import RouteGuard from "./RouteGuard";
@@ -73,9 +74,12 @@ export default function MobileRoutes() {
 
   return (
     <Routes>
+      {/* Unauthenticated visitors see the marketing landing page (same as
+          desktop) with an in-page login modal, instead of being bounced
+          straight to /login. Authenticated users go to their home surface. */}
       <Route
         path="/"
-        element={<Navigate to={authenticated ? fallback : "/login"} replace />}
+        element={authenticated ? <Navigate to={fallback} replace /> : <Landing />}
       />
       <Route path="/login" element={<LoginRoute fallback={fallback} />} />
 
